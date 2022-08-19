@@ -30,6 +30,7 @@ enum crc_format {
 #define ARG_KEY_DRY_RUN (1)
 #define ARG_KEY_START_MAGIC (2)
 #define ARG_KEY_END_MAGIC (3)
+#define ARG_KEY_LIST (4)
 
 struct command_line_options {
 	bool little_endian;
@@ -42,6 +43,7 @@ struct command_line_options {
 	uint32_t start_magic;
 	bool has_end_magic;
 	uint32_t end_magic;
+	bool list;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
@@ -59,6 +61,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	case ARG_KEY_END_MAGIC:
 		args->has_end_magic = true;
 		args->end_magic = strtoul(arg, NULL, 0);
+		break;
+	case ARG_KEY_LIST:
+		args->list = true;
 		break;
 	case 'l':
 		args->little_endian = true;
@@ -104,6 +109,7 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 		{"crc-format", 'F', "FORMAT", 0, "Output Format for CRCs.", 2},
 		{"start-magic", ARG_KEY_START_MAGIC, "STARTMAGIC", 0, "Check output section for start magic (uint32)", 2},
 		{"end-magic", ARG_KEY_END_MAGIC, "STARTMAGIC", 0, "Check output section for start magic (uint32)", 2},
+		{"list-crcs", ARG_KEY_LIST, 0, 0 , "List predefined CRCs", 0},
 		/* Sentinel */
 		{NULL, 0, 0, 0, NULL, 0}
 	};
@@ -134,6 +140,7 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->format = FORMAT_BARE;
 	opts->has_end_magic = false;
 	opts->has_start_magic = false;
+	opts->list = false;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
@@ -167,6 +174,11 @@ int main(int argc, char **argv)
 
 	verbose = cmd_opts.verbose || cmd_opts.dry_run;
 	print_verbose_start_info(&cmd_opts);
+
+	if (cmd_opts.list) {
+		list_predefined_crcs();
+		return 0;
+	}
 
 	return 0;
 }

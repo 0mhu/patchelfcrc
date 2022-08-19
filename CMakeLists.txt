@@ -23,8 +23,11 @@ add_custom_target(
 
 add_compile_options(-Wall -Wextra -Wold-style-declaration -Wuninitialized -Wmaybe-uninitialized -Wunused-parameter)
 
+set(FORT_ENABLE_TESTING OFF CACHE INTERNAL "")
+add_subdirectory(3rdparty/libfort)
+
 add_executable(${PROJECT_NAME} ${CFILES})
-target_link_libraries(${PROJECT_NAME} ${ELF_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${ELF_LIBRARIES} fort)
 target_link_directories(${PROJECT_NAME} PRIVATE ${ELF_LIBRARY_DIRS})
 target_include_directories(${PROJECT_NAME} PRIVATE ${ELF_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")

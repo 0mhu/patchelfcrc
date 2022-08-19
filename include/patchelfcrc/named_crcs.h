@@ -20,4 +20,6 @@ const struct named_crc *reverse_lookup_named_crc(const struct crc_settings *sett
 
 const struct named_crc *lookup_named_crc(const char *name);
 
+void list_predefined_crcs(void);
+
 #endif /* _NAMED_CRCS_H_ */

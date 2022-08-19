@@ -1,6 +1,8 @@
 #include <patchelfcrc/named_crcs.h>
 #include <stddef.h>
 #include <string.h>
+#include <fort.h>
+#include <stdio.h>
 
 #define NAMED_CRC(crc_name, poly, reverse, init, outxor) { \
 	.name = crc_name, \
@@ -35,9 +37,9 @@ const struct named_crc predefined_crc_table[] = {
 	NAMED_CRC("x-25", 0x1021, true, 0x0000, 0xFFFF),
 	NAMED_CRC("xmodem", 0x1021, false, 0x0000, 0x0000),
 	NAMED_CRC("modbus", 0x8005, true, 0xFFFF, 0x0000),
-	NAMED_CRC("kermit [1]", 0x1021, true, 0x0000, 0x0000),
-	NAMED_CRC("crc-ccitt-false [1]", 0x1021, false, 0xFFFF, 0x0000),
-	NAMED_CRC("crc-aug-ccitt [1]", 0x1021, false, 0x1D0F, 0x0000),
+	NAMED_CRC("kermit", 0x1021, true, 0x0000, 0x0000),
+	NAMED_CRC("crc-ccitt-false", 0x1021, false, 0xFFFF, 0x0000),
+	NAMED_CRC("crc-aug-ccitt", 0x1021, false, 0x1D0F, 0x0000),
 	NAMED_CRC("crc-24", 0x864CFB, false, 0xB704CE, 0x000000),
 	NAMED_CRC("crc-24-flexray-a", 0x5D6DCB, false, 0xFEDCBA, 0x000000),
 	NAMED_CRC("crc-24-flexray-b", 0x5D6DCB, false, 0xABCDEF, 0x000000),
@@ -85,4 +87,27 @@ const struct named_crc *lookup_named_crc(const char *name)
 	}
 
 	return found;
+}
+
+void list_predefined_crcs(void)
+{
+	ft_table_t *table;
+	const struct named_crc *iter;
+
+	table = ft_create_table();
+
+	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
+	ft_write_ln(table, "Name", "Polynomial", "Reversed", "Start Value", "Output XOR");
+
+	for (iter = predefined_crc_table; iter->name; iter++) {
+		ft_printf_ln(table, "%s|0x%x|%s|0x%x|0x%x",
+			     iter->name,
+			     iter->settings.polynomial,
+			     iter->settings.rev ? "yes" : "no",
+			     iter->settings.start_value,
+			     iter->settings.xor);
+	}
+
+	printf("%s\n", ft_to_string(table));
+	ft_destroy_table(table);
 }
