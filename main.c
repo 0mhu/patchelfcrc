@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <patchelfcrc/named_crcs.h>
 #include <patchelfcrc/version.h>
+#include <linklist-lib/singly-linked-list.h>
 
 #define print_err(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__);
 #define print_debug(fmt, ...) do { \
@@ -44,6 +45,7 @@ struct command_line_options {
 	bool has_end_magic;
 	uint32_t end_magic;
 	bool list;
+	SlList *section_list;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
@@ -70,6 +72,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case 'v':
 		args->verbose = true;
+		break;
+	case 'S':
+		/* Section */
+		args->section_list = sl_list_append(args->section_list, strdup(arg));
 		break;
 	case 'g':
 		if (!strcmp(arg, "byte"))
@@ -141,11 +147,14 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->has_end_magic = false;
 	opts->has_start_magic = false;
 	opts->list = false;
+	opts->section_list = NULL;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
 {
 	bool verbose = cmd_opts->verbose;
+	int i;
+	SlList *list_iter;
 	const struct named_crc *predef_crc;
 
 	print_debug("Start CRC patching\n");
@@ -162,6 +171,27 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 		print_debug("Predefined CRC detected: %s\n", predef_crc->name);
 	}
 
+	if (cmd_opts->section_list) {
+		for (list_iter = cmd_opts->section_list, i = 1; list_iter; list_iter = sl_list_next(list_iter), i++) {
+			print_debug("Input section [%d]: \"%s\"\n", i, (const char *)list_iter->data);
+		}
+	}
+
+}
+
+static void free_cmd_args(struct command_line_options *opts)
+{
+	SlList *list_iter;
+
+	/* Free the output section names */
+	for (list_iter = opts->section_list; list_iter; list_iter = sl_list_next(list_iter)) {
+		if (list_iter->data)
+			free(list_iter->data);
+	}
+
+	/* Free the section list */
+	sl_list_free(opts->section_list);
+	opts->section_list = NULL;
 }
 
 int main(int argc, char **argv)
@@ -177,8 +207,11 @@ int main(int argc, char **argv)
 
 	if (cmd_opts.list) {
 		list_predefined_crcs();
-		return 0;
+		goto free_cmds;
 	}
+free_cmds:
+
+	free_cmd_args(&cmd_opts);
 
 	return 0;
 }
