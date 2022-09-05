@@ -15,22 +15,40 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _NAMED_CRCS_H_
-#define _NAMED_CRCS_H_
+#ifndef _CRC_H_
+#define _CRC_H_
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <patchelfcrc/crc.h>
+#include <stddef.h>
 
-struct named_crc {
-    const char *name;
-    struct crc_settings settings;
+struct crc_settings {
+    uint64_t polynomial;
+    uint32_t xor;
+    uint32_t start_value;
+    bool rev;
 };
 
-const struct named_crc *reverse_lookup_named_crc(const struct crc_settings *settings);
+struct crc_calc {
+    struct crc_settings settings;
+    uint32_t crc_val;
+    uint32_t crc_mask;
+    uint32_t crc_length;
+    uint32_t *table;
+};
 
-const struct named_crc *lookup_named_crc(const char *name);
+int crc_len_from_poly(uint64_t polynomial);
 
-void list_predefined_crcs(void);
+void crc_init(struct crc_calc *crc, const struct crc_settings *settings);
 
-#endif /* _NAMED_CRCS_H_ */
+void crc_destroy(struct crc_calc *crc);
+
+void crc_push_byte(struct crc_calc *crc, uint8_t b);
+
+void crc_push_bytes(struct crc_calc *crc, const uint8_t *b, size_t len);
+
+void crc_finish_calc(struct crc_calc *crc);
+
+uint32_t crc_get_value(struct crc_calc *crc);
+
+#endif /* _CRC_H_ */

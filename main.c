@@ -1,3 +1,20 @@
+/*
+ * This file is part of patchelfcrc .
+ * Copyright (c) 2022 Mario Hüttel.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 2 only.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <libelf.h>
 #include <argp.h>
@@ -5,6 +22,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <patchelfcrc/named_crcs.h>
+#include <patchelfcrc/crc.h>
 #include <patchelfcrc/version.h>
 #include <linklist-lib/singly-linked-list.h>
 
@@ -51,6 +69,8 @@ struct command_line_options {
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
 	struct command_line_options *args = (struct command_line_options *)state->input;
+	char *endptr;
+
 	switch (key) {
 	case ARG_KEY_DRY_RUN:
 		args->dry_run = true;
@@ -66,6 +86,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case ARG_KEY_LIST:
 		args->list = true;
+		break;
+	case 'p':
+		/* Polyniomial */
+		args->crc.polynomial = strtoull(arg, &endptr, 0);
+		if (endptr == arg) {
+			argp_error(state, "Error parsing polynomial: %s\n", arg);
+		}
 		break;
 	case 'l':
 		args->little_endian = true;
@@ -140,7 +167,7 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->granularity = GRANULARITY_BYTE;
 	opts->dry_run = false;
 	opts->crc.xor = 0UL;
-	opts->crc.polynomial = 0x04C11DB7UL;
+	opts->crc.polynomial = 0x104C11DB7UL;
 	opts->crc.start_value = 0xFFFFFFFFUL;
 	opts->crc.rev = false;
 	opts->format = FORMAT_BARE;
@@ -169,6 +196,12 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 	predef_crc = reverse_lookup_named_crc(&cmd_opts->crc);
 	if (predef_crc) {
 		print_debug("Predefined CRC detected: %s\n", predef_crc->name);
+	} else {
+		print_debug("Generator polynomial: 0x%lx\n", cmd_opts->crc.polynomial);
+		print_debug("Start value: 0x%x\n", cmd_opts->crc.start_value);
+		print_debug("Output XOR: 0x%x\n", cmd_opts->crc.xor);
+		print_debug("Reversed: %s\n", cmd_opts->crc.rev ? "yes" : "no");
+		print_debug("CRC length: %d\n", crc_len_from_poly(cmd_opts->crc.polynomial));
 	}
 
 	if (cmd_opts->section_list) {
@@ -197,6 +230,7 @@ static void free_cmd_args(struct command_line_options *opts)
 int main(int argc, char **argv)
 {
 	bool verbose;
+	struct crc_calc crc;
 	struct command_line_options cmd_opts;
 
 	prepare_default_opts(&cmd_opts);
@@ -209,6 +243,9 @@ int main(int argc, char **argv)
 		list_predefined_crcs();
 		goto free_cmds;
 	}
+
+	/* Build the CRC */
+	crc_init(&crc, &cmd_opts.crc);
 free_cmds:
 
 	free_cmd_args(&cmd_opts);

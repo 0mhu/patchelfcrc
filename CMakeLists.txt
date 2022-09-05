@@ -9,6 +9,7 @@ set (CFILES
 	main.c
 	version.c
 	named_crcs.c
+	crc.c
 )
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")
