@@ -69,6 +69,7 @@ struct command_line_options {
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
 	struct command_line_options *args = (struct command_line_options *)state->input;
+	const struct named_crc *looked_up_crc;
 	char *endptr;
 
 	switch (key) {
@@ -91,7 +92,11 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		/* Polyniomial */
 		args->crc.polynomial = strtoull(arg, &endptr, 0);
 		if (endptr == arg) {
-			argp_error(state, "Error parsing polynomial: %s\n", arg);
+			if ((looked_up_crc = lookup_named_crc(arg))) {
+				memcpy(&args->crc, &looked_up_crc->settings, sizeof(struct crc_settings));
+			} else {
+				argp_error(state, "Error parsing polynomial: %s\n", arg);
+			}
 		}
 		break;
 	case 'l':
@@ -246,6 +251,13 @@ int main(int argc, char **argv)
 
 	/* Build the CRC */
 	crc_init(&crc, &cmd_opts.crc);
+
+	/* Perform the check test */
+	crc_push_bytes(&crc, "123456789", 9u);
+	crc_finish_calc(&crc);
+	printf("CRC Check value: 0x%08x\n", crc_get_value(&crc));
+
+	crc_destroy(&crc);
 free_cmds:
 
 	free_cmd_args(&cmd_opts);

@@ -97,7 +97,7 @@ const struct named_crc *lookup_named_crc(const char *name)
 	const struct named_crc *found = NULL;
 
 	for (iter = predefined_crc_table; iter->name; iter++) {
-		if (strcmp(iter->name, name)) {
+		if (!strcmp(iter->name, name)) {
 			found = iter;
 			break;
 		}
