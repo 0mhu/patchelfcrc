@@ -101,7 +101,7 @@ void crc_init(struct crc_calc *crc, const struct crc_settings *settings)
 
 	crc->table = (uint32_t *)malloc(256 * sizeof(uint32_t));
 	crc->crc_length = crc_len_from_poly(crc->settings.polynomial);
-	crc->crc_val = settings->start_value;
+	crc->crc_val = settings->start_value ^ settings->xor;
 
 	crc->crc_mask = 0x0UL;
 	for (i = 0; i < crc->crc_length; i++)
@@ -142,20 +142,5 @@ uint32_t crc_get_value(struct crc_calc *crc)
 
 void crc_finish_calc(struct crc_calc *crc)
 {
-	uint32_t val;
-	uint32_t i;
-
-	if (!crc)
-		return;
-
 	crc->crc_val ^= crc->settings.xor;
-	val = crc->crc_val;
-	if (crc->settings.rev) {
-		crc->crc_val = 0x0ul;
-		for (i = 0; i < crc->crc_length; i++) {
-			if (val & (1<<(crc->crc_length - i - 1))) {
-				crc->crc_val |= (1 << i);
-			}
-		}
-	}
 }
