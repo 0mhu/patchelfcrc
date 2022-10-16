@@ -25,13 +25,8 @@
 #include <patchelfcrc/crc.h>
 #include <patchelfcrc/version.h>
 #include <linklist-lib/singly-linked-list.h>
-
-#define print_err(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__);
-#define print_debug(fmt, ...) do { \
-				if (verbose) { \
-					printf("[DBG] "fmt, ## __VA_ARGS__); \
-				} \
-				} while (0)
+#include <patchelfcrc/reporting.h>
+#include <patchelfcrc/elfpatch.h>
 
 const char *argp_program_bug_address = "<mario.huettel@linux.com>";
 
@@ -64,6 +59,7 @@ struct command_line_options {
 	uint32_t end_magic;
 	bool list;
 	SlList *section_list;
+	const char *elf_path;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
@@ -117,6 +113,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		else if  (!strcmp(arg, "word"))
 			args->granularity = GRANULARITY_32BIT;
 		break;
+	case ARGP_KEY_ARG:
+		if (state->arg_num >= 1)
+			argp_usage(state);
+		else
+			args->elf_path = arg;
+		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
@@ -155,7 +157,7 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 	static struct argp arg_parser = {
 		options,
 		parse_opt,
-		NULL,
+		"ELF",
 		NULL,
 		0, 0, 0
 	};
@@ -180,11 +182,11 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->has_start_magic = false;
 	opts->list = false;
 	opts->section_list = NULL;
+	opts->elf_path = NULL;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
 {
-	bool verbose = cmd_opts->verbose;
 	int i;
 	SlList *list_iter;
 	const struct named_crc *predef_crc;
@@ -207,6 +209,10 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 		print_debug("Output XOR: 0x%x\n", cmd_opts->crc.xor);
 		print_debug("Reversed: %s\n", cmd_opts->crc.rev ? "yes" : "no");
 		print_debug("CRC length: %d\n", crc_len_from_poly(cmd_opts->crc.polynomial));
+	}
+
+	if (cmd_opts->elf_path) {
+		print_debug("ELF file: %s\n", cmd_opts->elf_path);
 	}
 
 	if (cmd_opts->section_list) {
@@ -234,28 +240,46 @@ static void free_cmd_args(struct command_line_options *opts)
 
 int main(int argc, char **argv)
 {
-	bool verbose;
 	struct crc_calc crc;
 	struct command_line_options cmd_opts;
+	struct elfpatch ep;
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
 
-	verbose = cmd_opts.verbose || cmd_opts.dry_run;
+	if (cmd_opts.verbose || cmd_opts.dry_run)
+		reporting_enable_verbose();
 	print_verbose_start_info(&cmd_opts);
+
+	/* Check if file has been supplied */
+	if (!cmd_opts.elf_path) {
+		print_err("No ELF file specified. Exiting...\n");
+		return -1;
+	}
 
 	if (cmd_opts.list) {
 		list_predefined_crcs();
 		goto free_cmds;
 	}
 
+	/* Do error printing if using a reversed polynomial. It is not implemented yet! */
+	if (cmd_opts.crc.rev) {
+		print_err("Reversed polynomials are not supported yet\nExiting...\n");
+		goto free_cmds;
+	}
+
 	/* Build the CRC */
 	crc_init(&crc, &cmd_opts.crc);
 
-	/* Perform the check test */
-	crc_push_bytes(&crc, "123456789", 9u);
-	crc_finish_calc(&crc);
-	printf("CRC Check value: 0x%08x\n", crc_get_value(&crc));
+	/* Prepare libelf for use with the latest ELF version */
+	elf_version(EV_CURRENT);
+
+	/* Open the ELF file */
+	elf_patch_open(&ep, cmd_opts.elf_path);
+
+	elf_patch_print_stats(&ep);
+
+	elf_patch_close(&ep);
 
 	crc_destroy(&crc);
 free_cmds:

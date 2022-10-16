@@ -10,6 +10,8 @@ set (CFILES
 	version.c
 	named_crcs.c
 	crc.c
+	elfpatch.c
+	reporting.c
 )
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")
