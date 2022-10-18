@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 {
 	struct crc_calc crc;
 	struct command_line_options cmd_opts;
-	struct elfpatch ep;
+	elfpatch_handle_t *ep;
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
@@ -275,11 +275,9 @@ int main(int argc, char **argv)
 	elf_version(EV_CURRENT);
 
 	/* Open the ELF file */
-	elf_patch_open(&ep, cmd_opts.elf_path);
+	ep = elf_patch_open(cmd_opts.elf_path);
 
-	elf_patch_print_stats(&ep);
-
-	elf_patch_close(&ep);
+	elf_patch_close_and_free(ep);
 
 	crc_destroy(&crc);
 free_cmds:

@@ -20,3 +20,8 @@ void reporting_enable_verbose(void)
 {
 	global_verbosity_state = true;
 }
+
+bool reporting_get_verbosity(void)
+{
+	return global_verbosity_state;
+}

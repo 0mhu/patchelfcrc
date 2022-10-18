@@ -1,17 +1,12 @@
 #ifndef _ELFPATCH_H_
 #define _ELFPATCH_H_
 
-#include <libelf.h>
+#include <stdint.h>
 
-struct elfpatch {
-    int fd;
-    Elf *elf;
-};
+typedef struct elfpatch elfpatch_handle_t;
 
-int elf_patch_open(struct elfpatch *ep, const char *path);
+elfpatch_handle_t *elf_patch_open(const char *path);
 
-void elf_patch_print_stats(const struct elfpatch *ep);
-
-void elf_patch_close(struct elfpatch *ep);
+void elf_patch_close_and_free(elfpatch_handle_t *ep);
 
 #endif /* _ELFPATCH_H_ */
