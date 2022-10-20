@@ -20,6 +20,7 @@ struct elf_section {
 struct elfpatch {
 	uint32_t magic;
 	int fd;
+	bool readonly;
 	Elf *elf;
 	GElf_Ehdr ehdr;
 	int class;
@@ -218,7 +219,7 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 	return 0;
 }
 
-elfpatch_handle_t *elf_patch_open(const char *path)
+elfpatch_handle_t *elf_patch_open(const char *path, bool readonly)
 {
 	struct elfpatch *ep;
 
@@ -229,13 +230,14 @@ elfpatch_handle_t *elf_patch_open(const char *path)
 
 	ep = (struct elfpatch *)calloc(1u, sizeof(struct elfpatch));
 	ep->magic = ELFPATCH_MAGIC;
+	ep->readonly = readonly;
 
-	ep->fd = open(path, O_RDWR, 0);
+	ep->fd = open(path, readonly ? O_RDONLY : O_RDWR, 0);
 	if (ep->fd < 0) {
 		print_err("Error opening file: %s\n", path);
 		goto free_struct;
 	}
-	ep->elf = elf_begin(ep->fd, ELF_C_RDWR, NULL);
+	ep->elf = elf_begin(ep->fd, readonly ? ELF_C_READ : ELF_C_RDWR, NULL);
 	if (!ep->elf) {
 		print_err("[LIBELF] %s\n", elf_errmsg(-1));
 		goto close_fd;

@@ -27,6 +27,7 @@
 #include <linklist-lib/singly-linked-list.h>
 #include <patchelfcrc/reporting.h>
 #include <patchelfcrc/elfpatch.h>
+#include <fort.h>
 
 const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] com>";
 
@@ -232,11 +233,101 @@ static void free_cmd_args(struct command_line_options *opts)
 	opts->section_list = NULL;
 }
 
+/**
+ * @brief check_all_sections_present
+ * @param ep
+ * @param list
+ * @return -1 if no sections are provided. 0 if all sections are present. -2 if setions cannot be found
+ */
+static int check_all_sections_present(elfpatch_handle_t *ep, SlList *list)
+{
+	SlList *iter;
+	const char *sec_name;
+	int ret = 0;
+
+	if (!ep)
+		return -1001;
+	if (!list) {
+		print_err("No input sections specified.\n")
+		return -1;
+	}
+	for (iter = list; iter; iter = sl_list_next(iter)) {
+		sec_name = (const char *)iter->data;
+		if (!sec_name)
+			continue;
+		if (elf_patch_check_for_section(ep, sec_name)) {
+			print_err("Cannot find section '%s'\n", sec_name);
+			ret = -2;
+		} else {
+			print_debug("Input section '%s': found\n", sec_name);
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * @brief Compute CRCs over the sections in @p list
+ * @param ep Elf patch
+ * @param list List of section names to patch
+ * @param opts Command line options. Used for CRC generation
+ * @param[out] crcs Array of output CRCs. Must be large enough to hold all elements
+ * @return 0 if successful
+ */
+static int compute_crcs(elfpatch_handle_t *ep, SlList *list, const struct command_line_options *opts, uint32_t *crcs)
+{
+	SlList *iter;
+	const char *sec_name;
+	int ret = 0;
+	struct crc_calc _crc;
+	struct crc_calc * const crc = &_crc;
+	unsigned int idx;
+
+	/* Construct the CRC */
+	crc_init(crc, &opts->crc);
+
+	for (iter = list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
+		crc_reset(crc);
+		sec_name = (const char *)iter->data;
+		if (elf_patch_compute_crc_over_section(ep, sec_name, crc, opts->granularity, opts->little_endian)) {
+			print_err("Error during CRC calculation. Exiting.\n");
+			ret = -1;
+			break;
+		}
+		crc_finish_calc(crc);
+		crcs[idx] = crc_get_value(crc);
+	}
+
+	return ret;
+}
+
+static void print_crcs(SlList *list, const uint32_t *crcs)
+{
+	SlList *iter;
+	unsigned int idx;
+	const char *sec_name;
+	ft_table_t *table;
+
+	table = ft_create_table();
+
+	/* Write header */
+	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
+	ft_write_ln(table, "Section", "CRC");
+
+	for (iter = list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
+		sec_name = (const char *)iter->data;
+		ft_printf_ln(table, "%s|0x%x", sec_name, crcs[idx]);
+	}
+	print_debug("Calculated CRCs:\n%s\n", ft_to_string(table));
+	ft_destroy_table(table);
+}
+
 int main(int argc, char **argv)
 {
-	struct crc_calc crc;
 	struct command_line_options cmd_opts;
 	elfpatch_handle_t *ep;
+	int ret = 0;
+	uint32_t *crcs;
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
@@ -262,26 +353,35 @@ int main(int argc, char **argv)
 		goto free_cmds;
 	}
 
-	/* Build the CRC */
-	crc_init(&crc, &cmd_opts.crc);
-
 	/* Prepare libelf for use with the latest ELF version */
 	elf_version(EV_CURRENT);
 
 	/* Open the ELF file */
-	ep = elf_patch_open(cmd_opts.elf_path);
+	ep = elf_patch_open(cmd_opts.elf_path, cmd_opts.dry_run);
+	if (!ep) {
+		ret = -2;
+		goto free_cmds;
+	}
 
-	/* TODO: Implement this correctly! */
-	elf_patch_compute_crc_over_section(ep, ".text", &crc, cmd_opts.granularity, cmd_opts.little_endian);
+	/* Check if all sections are present */
+	if (check_all_sections_present(ep, cmd_opts.section_list)) {
+		ret = -2;
+		goto free_cmds;
+	}
+
+	/* Compute CRCs over sections */
+	crcs = (uint32_t *)malloc(sl_list_length(cmd_opts.section_list) * sizeof(uint32_t));
+	compute_crcs(ep, cmd_opts.section_list, &cmd_opts, crcs);
+
+	if (reporting_get_verbosity()) {
+		print_crcs(cmd_opts.section_list, crcs);
+	}
 
 	elf_patch_close_and_free(ep);
 
-	printf("CRC is: 0x%08x\n", crc_get_value(&crc));
-
-	crc_destroy(&crc);
 free_cmds:
 
 	free_cmd_args(&cmd_opts);
 
-	return 0;
+	return ret;
 }

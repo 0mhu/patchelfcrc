@@ -14,7 +14,7 @@ enum granularity {
 };
 
 
-elfpatch_handle_t *elf_patch_open(const char *path);
+elfpatch_handle_t *elf_patch_open(const char *path, bool readonly);
 
 /**
  * @brief Check if a section is present in file
