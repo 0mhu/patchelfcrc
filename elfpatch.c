@@ -9,6 +9,7 @@
 #include <libelf.h>
 #include <gelf.h>
 #include <linklist-lib/singly-linked-list.h>
+#include <fort.h>
 
 struct elf_section {
 	GElf_Shdr section_header;
@@ -46,7 +47,9 @@ struct elfpatch {
 static void free_elf_section_element(struct elf_section *sec)
 {
 	if (sec) {
-		free(sec->name);
+		if (sec->name)
+			free(sec->name);
+		sec->name = NULL;
 		free(sec);
 	}
 }
@@ -76,6 +79,46 @@ static const char *section_type_to_str(Elf64_Word type)
 	return "unknown";
 }
 
+static void print_sections(elfpatch_handle_t *ep)
+{
+	SlList *iter;
+	ft_table_t *table;
+	const struct elf_section *section;
+
+	ret_if_ep_err(ep);
+
+	if (!ep->sections) {
+		print_err("No sections found\n");
+		return;
+	}
+
+	if (!reporting_get_verbosity())
+		return;
+
+	table = ft_create_table();
+
+	/* Write header */
+	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
+	ft_write_ln(table, "Section", "Type", "Size", "Address", "File Offset");
+
+	for (iter = ep->sections; iter; iter = sl_list_next(iter)) {
+		section = (const struct elf_section *)iter->data;
+		if (!section)
+			continue;
+		ft_printf_ln(table, "%s|%s|%lu|0x%p|0x%p",
+			     section->name,
+			     section_type_to_str(section->section_header.sh_type),
+			     section->section_header.sh_size,
+			     (void *)section->section_header.sh_addr,
+			     (void *)section->section_header.sh_offset
+			     );
+	}
+
+	print_debug("%s\n", ft_to_string(table));
+
+	ft_destroy_table(table);
+}
+
 static SlList *elf_patch_get_sections(elfpatch_handle_t *ep)
 {
 	SlList *ret = NULL;
@@ -100,23 +143,22 @@ static SlList *elf_patch_get_sections(elfpatch_handle_t *ep)
 		sec = (struct elf_section *)calloc(1u, sizeof(struct elf_section));
 		sec->name = NULL;
 		sec->scn = scn;
-		ret = sl_list_append(ret, sec);
+
 		if (gelf_getshdr(scn, &sec->section_header) != &sec->section_header) {
 			print_err("Error reading section header: %s\n", elf_errmsg(-1));
-			goto ret_free_section_list;
+			free(sec);
+			continue;
 		}
 		name = elf_strptr(ep->elf, shstrndx, sec->section_header.sh_name);
 		if (name) {
-			print_debug("[SEC] [%s] %s | %zu bytes at 0x%x (File offset: 0x%x) \n",
-				    section_type_to_str(sec->section_header.sh_type),
-				    name, (size_t)sec->section_header.sh_size,
-				    sec->section_header.sh_addr,
-				    sec->section_header.sh_offset);
 			sec->name = strdup(name);
 		}
+		ret = sl_list_append(ret, sec);
 	}
 
 	ep->sections = ret;
+
+	print_sections(ep);
 
 	return ret;
 
@@ -220,12 +262,114 @@ free_struct:
 	return (elfpatch_handle_t *)ep;
 }
 
+static struct elf_section *find_section_in_list(SlList *list, const char *name)
+{
+	SlList *iter;
+	struct elf_section *ret = NULL;
+	struct elf_section *sec;
+
+	for (iter = list; iter; iter = sl_list_next(iter)) {
+		sec = (struct elf_section *)iter->data;
+		if (strcmp(sec->name, name) == 0) {
+			ret = sec;
+			break;
+		}
+	}
+
+
+	return ret;
+}
+
+int elf_patch_check_for_section(elfpatch_handle_t *ep, const char *section)
+{
+	int ret;
+
+	ret_val_if_ep_err(ep, -1001);
+
+	ret = find_section_in_list(ep->sections, section) ? 0 : -1;
+
+	return ret;
+}
+
+static size_t translate_index(size_t index, enum granularity granularity, bool little_endian)
+{
+	size_t word_idx;
+	size_t part_idx;
+	size_t d_index;
+	size_t gran_in_bytes;
+
+	if (!little_endian || granularity == GRANULARITY_BYTE)
+		return index;
+
+	gran_in_bytes = (size_t)granularity / 8u;
+	word_idx = index / gran_in_bytes;
+	part_idx = index - word_idx * gran_in_bytes;
+
+	d_index = word_idx * gran_in_bytes + gran_in_bytes - 1u - part_idx;
+
+	return d_index;
+}
+
+int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *section, struct crc_calc *crc,
+				       enum granularity granularity, bool little_endian)
+{
+	const struct elf_section *sec;
+	Elf_Data *data;
+	size_t idx;
+	unsigned int gran_in_bytes = (unsigned int)granularity / 8u;
+	unsigned int padding_count = 0u;
+
+	ret_val_if_ep_err(ep, -1001);
+	if (!section || !crc)
+		return -1000;
+
+	/* Find section */
+	sec = find_section_in_list(ep->sections, section);
+	if (!sec) {
+		print_err("Cannot find section %s\n", section);
+		return -1;
+	}
+
+	data = elf_getdata(sec->scn, NULL);
+	if (!data) {
+		print_err("Error reading section data from %s: %s\n", section, elf_errmsg(-1));
+		return -1;
+	}
+
+	print_debug("Section data length: %lu\n", data->d_size);
+	if (!data->d_size)
+		print_err("Section %s contains no data.\n", section);
+
+	/* If big endian or granularity is byte, simply compute CRC. No reordering is necessary */
+	if (!little_endian || granularity == GRANULARITY_BYTE) {
+		crc_push_bytes(crc, data->d_buf, data->d_size);
+	} else {
+		/* Little endian case with > byte sized chunks */
+
+		/* Check granularity vs size of section */
+		padding_count = (gran_in_bytes - data->d_size % gran_in_bytes) % gran_in_bytes;
+		if (padding_count) {
+			print_err("Section '%s' is not a multiple size of the given granularity. %u zero padding bytes will be added.\n",
+				  section, padding_count);
+		}
+
+		for (idx = 0; idx < data->d_size; idx++) {
+			crc_push_byte(crc, ((char *)data->d_buf)[translate_index(idx, granularity, little_endian)]);
+		}
+
+		/* Pad with zeroes */
+		for (idx = 0; idx < padding_count; idx++) {
+			crc_push_byte(crc, 0x00);
+		}
+	}
+
+	return 0;
+}
+
 void elf_patch_close_and_free(elfpatch_handle_t *ep)
 {
 	ret_if_ep_err(ep);
 
-	if (!ep)
-		return;
 	if (ep->elf)
 		elf_end(ep->elf);
 

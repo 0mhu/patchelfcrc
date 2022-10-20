@@ -30,12 +30,6 @@
 
 const char *argp_program_bug_address = "<mario.huettel@linux.com>";
 
-enum granularity {
-	GRANULARITY_BYTE = 8,
-	GRANULARITY_16BIT = 16,
-	GRANULARITY_32BIT = 32,
-};
-
 enum crc_format {
 	FORMAT_BARE = 0,
 	FORMAT_STRUCT,
@@ -277,7 +271,12 @@ int main(int argc, char **argv)
 	/* Open the ELF file */
 	ep = elf_patch_open(cmd_opts.elf_path);
 
+	/* TODO: Implement this correctly! */
+	elf_patch_compute_crc_over_section(ep, ".text", &crc, cmd_opts.granularity, cmd_opts.little_endian);
+
 	elf_patch_close_and_free(ep);
+
+	printf("CRC is: 0x%08x\n", crc_get_value(&crc));
 
 	crc_destroy(&crc);
 free_cmds:

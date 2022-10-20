@@ -101,7 +101,8 @@ void crc_init(struct crc_calc *crc, const struct crc_settings *settings)
 
 	crc->table = (uint32_t *)malloc(256 * sizeof(uint32_t));
 	crc->crc_length = crc_len_from_poly(crc->settings.polynomial);
-	crc->crc_val = settings->start_value ^ settings->xor;
+
+	crc_reset(crc);
 
 	crc->crc_mask = 0x0UL;
 	for (i = 0; i < crc->crc_length; i++)
@@ -109,6 +110,11 @@ void crc_init(struct crc_calc *crc, const struct crc_settings *settings)
 
 	/* Initialize the table */
 	fill_crc_table(crc);
+}
+
+void crc_reset(struct crc_calc *crc)
+{
+	crc->crc_val = crc->settings.start_value ^ crc->settings.xor;
 }
 
 void crc_push_bytes(struct crc_calc *crc, const uint8_t *b, size_t len)

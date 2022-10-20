@@ -41,6 +41,8 @@ int crc_len_from_poly(uint64_t polynomial);
 
 void crc_init(struct crc_calc *crc, const struct crc_settings *settings);
 
+void crc_reset(struct crc_calc *crc);
+
 void crc_destroy(struct crc_calc *crc);
 
 void crc_push_byte(struct crc_calc *crc, uint8_t b);
