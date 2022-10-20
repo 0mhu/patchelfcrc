@@ -28,7 +28,7 @@
 #include <patchelfcrc/reporting.h>
 #include <patchelfcrc/elfpatch.h>
 
-const char *argp_program_bug_address = "<mario.huettel@linux.com>";
+const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] com>";
 
 enum crc_format {
 	FORMAT_BARE = 0,
