@@ -1,0 +1,39 @@
+# Maintainer: Mario Hüttel <mario (dot) huettel (!) gmx (dot) net>
+
+pkgname=patchelfcrc
+pkgver=v1.2_10_g00d02b8
+pkgrel=1
+pkgdesc="Conversion tool for converting GDS layout files into TikZ Code and PDF"
+arch=('i686' 'x86_64')
+url="https://git.shimatta.de/mhu/gds-render"
+licence=('GPLv2')
+depends=('glib2' 'gtk3' 'cairo')
+makedepends=('cmake' 'git')
+privides=('gds-render')
+source=("${pkgname}-git"::"git+https://git.shimatta.de/mhu/patchelfcrc" "git+https://git.shimatta.de/3rd-party/libfort.git" "git+https://git.shimatta.de/mhu/linklist-lib")
+sha1sums=('SKIP' 'SKIP')
+
+pkgver () {
+	_date=`date +"%Y%m%d"`
+	cd "${srcdir}/${pkgname}-git"
+	echo "$(echo "$(sh ./gen-version-string.sh)" | sed 's/-/_/g')"
+}
+
+build () {
+	mkdir "$srcdir/$pkgname-git/build"
+	cd "$srcdir/$pkgname-git/build"
+	cmake -DCMAKE_BUILD_TYPE=Release ..
+	make -j12
+}
+
+prepare () {
+	cd "${pkgname}-git"
+	git submodule init
+	git config submodule.libfort.url "$srcdir/libfort"
+	git config submodule.linklist-lib "$srcdir/linklist-lib"
+	git submodule update
+}
+
+package () {
+	install -Dm "$srcdir/$pkgname-git/build/patchelfcrc" "$pkgdir/usr/bin/patchelfcrc"
+}
