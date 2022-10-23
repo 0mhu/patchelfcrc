@@ -1,7 +1,7 @@
 # Maintainer: Mario Hüttel <mario (dot) huettel (!) gmx (dot) net>
 
 pkgname=patchelfcrc
-pkgver=v1.2_10_g00d02b8
+pkgver=ecd3b97
 pkgrel=1
 pkgdesc="Tool for patching CRC checksums of sections into ELF binaries"
 arch=('i686' 'x86_64')
@@ -35,5 +35,5 @@ prepare () {
 }
 
 package () {
-	install -Dm "$srcdir/$pkgname-git/build/patchelfcrc" "$pkgdir/usr/bin/patchelfcrc"
+	install -Dm755 "$srcdir/$pkgname-git/build/patchelfcrc" "$pkgdir/usr/bin/patchelfcrc"
 }
