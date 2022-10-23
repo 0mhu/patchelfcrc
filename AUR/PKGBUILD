@@ -1,7 +1,7 @@
 # Maintainer: Mario Hüttel <mario (dot) huettel (!) gmx (dot) net>
 
 pkgname=patchelfcrc
-pkgver=ecd3b97
+pkgver=5e7f697
 pkgrel=1
 pkgdesc="Tool for patching CRC checksums of sections into ELF binaries"
 arch=('i686' 'x86_64')
