@@ -1,5 +1,5 @@
 /*
- * This file is part of patchelfcrc .
+ * This file is part of patchelfcrc.
  * Copyright (c) 2022 Mario Hüttel.
  *
  * This program is free software: you can redistribute it and/or modify

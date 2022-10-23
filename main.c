@@ -31,11 +31,6 @@
 
 const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] com>";
 
-enum crc_format {
-	FORMAT_BARE = 0,
-	FORMAT_STRUCT,
-};
-
 #define ARG_KEY_DRY_RUN (1)
 #define ARG_KEY_START_MAGIC (2)
 #define ARG_KEY_END_MAGIC (3)
@@ -55,6 +50,7 @@ struct command_line_options {
 	bool list;
 	SlList *section_list;
 	const char *elf_path;
+	const char *output_section;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
@@ -107,6 +103,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 			args->granularity = GRANULARITY_16BIT;
 		else if  (!strcmp(arg, "word"))
 			args->granularity = GRANULARITY_32BIT;
+		break;
+	case 'O':
+		args->output_section = arg;
 		break;
 	case ARGP_KEY_ARG:
 		if (state->arg_num >= 1)
@@ -178,6 +177,7 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->list = false;
 	opts->section_list = NULL;
 	opts->elf_path = NULL;
+	opts->output_section = NULL;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
@@ -208,6 +208,10 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 
 	if (cmd_opts->elf_path) {
 		print_debug("ELF file: %s\n", cmd_opts->elf_path);
+	}
+
+	if (cmd_opts->output_section) {
+		print_debug("Output section: %s\n", cmd_opts->output_section);
 	}
 
 	if (cmd_opts->section_list) {
@@ -342,6 +346,10 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	if (!cmd_opts.output_section) {
+		print_err("No output section specified. Will continue but not patch file.\n");
+	}
+
 	if (cmd_opts.list) {
 		list_predefined_crcs();
 		goto free_cmds;
@@ -375,6 +383,15 @@ int main(int argc, char **argv)
 
 	if (reporting_get_verbosity()) {
 		print_crcs(cmd_opts.section_list, crcs);
+	}
+
+	if (cmd_opts.output_section) {
+		if (elf_patch_write_crcs_to_section(ep, cmd_opts.output_section, cmd_opts.section_list,
+					crcs, 32, cmd_opts.start_magic, cmd_opts.end_magic,
+					cmd_opts.has_start_magic, cmd_opts.has_end_magic,
+					FORMAT_BARE, cmd_opts.little_endian)) {
+			ret = -1;
+		}
 	}
 
 	elf_patch_close_and_free(ep);

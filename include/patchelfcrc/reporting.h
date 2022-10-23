@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#define print_err(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__);
+#define print_err(fmt, ...) fprintf(stderr, "[ERR] " fmt, ## __VA_ARGS__);
 
 void print_debug(const char *fmt, ...);
 

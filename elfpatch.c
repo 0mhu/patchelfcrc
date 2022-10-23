@@ -43,7 +43,46 @@ struct elfpatch {
 	} \
 	} while(0)
 
-#define print_err(fmt, ...) fprintf(stderr, (fmt), ## __VA_ARGS__);
+/**
+ * @brief Convert a series of 4 bytes into a uint32_t dpending on endianess
+ * @param data 4 bytes
+ * @param little_endian data is little endian
+ * @return uint32
+ */
+static uint32_t get_uint32_from_byte_string(const uint8_t *data, bool little_endian)
+{
+	uint32_t out = 0ul;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		if (little_endian)
+			out >>= 8u;
+		else
+			out <<= 8u;
+
+		out |= (((uint32_t)data[i]) << (little_endian ? 24u : 0u));
+	}
+
+	return out;
+}
+
+static void write_crc_to_byte_array(uint8_t *byte_array, uint32_t crc, uint8_t crc_size_bytes, bool little_endian)
+{
+	int i;
+
+	if (!byte_array)
+		return;
+
+	for (i = 0; i < crc_size_bytes; i++) {
+		if (little_endian) {
+			byte_array[i] = (uint8_t)(crc & 0xFFul);
+			crc >>= 8u;
+		} else {
+			byte_array[i] = (uint8_t)((crc & 0xFF000000ul) >> 24u);
+			crc <<= 8u;
+		}
+	}
+}
 
 static void free_elf_section_element(struct elf_section *sec)
 {
@@ -278,7 +317,6 @@ static struct elf_section *find_section_in_list(SlList *list, const char *name)
 		}
 	}
 
-
 	return ret;
 }
 
@@ -366,6 +404,128 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 	}
 
 	return 0;
+}
+
+int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, const SlList *section_name_list,
+				    const uint32_t *crcs, uint8_t crc_size_bits, uint32_t start_magic, uint32_t end_magic,
+				    bool check_start_magic, bool check_end_magic, enum crc_format format, bool little_endian)
+{
+	int ret = -1;
+	struct elf_section *output_section;
+	Elf_Data *output_sec_data;
+	const SlList *iter;
+	size_t needed_space;
+	size_t crc_count;
+	uint8_t crc_size_bytes;
+	uint8_t *sec_bytes;
+	size_t idx;
+
+	ret_val_if_ep_err(ep, -1000);
+
+	print_debug("== Patch output file ==\n");
+
+	if (crc_size_bits < 1u || crc_size_bits > 32u) {
+		print_err("Unsupported CRC size: %u", (unsigned int)crc_size_bits);
+		return -1;
+	}
+
+	if (format != FORMAT_BARE) {
+		print_err("Currently only bare format is supported!\n");
+		return -1;
+	}
+
+	/* All pointer parameters are required */
+	if (!section || !section_name_list || !crcs)
+		return -1000;
+
+	output_section = find_section_in_list(ep->sections, section);
+	if (!output_section) {
+		print_err("Cannot find output section '%s' to place CRCs. Exiting.\n", section);
+		goto ret_err;
+	}
+
+	/* Get data object of section */
+	output_sec_data = elf_getdata(output_section->scn, NULL);
+	sec_bytes = (uint8_t *)output_sec_data->d_buf;
+
+	/* Check the start and end magics */
+	if (check_start_magic) {
+		if (get_uint32_from_byte_string(sec_bytes, little_endian) != start_magic) {
+			print_err("Start magic does not match: expected: 0x%08x, got: 0x%08x\n",
+				  start_magic, get_uint32_from_byte_string(sec_bytes, little_endian));
+			goto ret_err;
+		}
+		print_debug("Start magic matching: 0x%08x\n", start_magic);
+	}
+	if (check_end_magic) {
+		if (get_uint32_from_byte_string(&sec_bytes[output_sec_data->d_size - 4], little_endian) != end_magic) {
+			print_err("End magic does not match: expected: 0x%08x, got: 0x%08x\n",
+				  end_magic,
+				  get_uint32_from_byte_string(&sec_bytes[output_sec_data->d_size - 4], little_endian));
+			goto ret_err;
+		}
+		print_debug("End magic matching: 0x%08x\n", end_magic);
+	}
+
+	/* Calculate Bytes needed for CRC */
+	crc_size_bytes = (crc_size_bits + 7u) / 8u;
+	crc_count = sl_list_length(section_name_list);
+
+	print_debug("CRC requires %u bytes.\n", (unsigned int)crc_size_bytes);
+	switch (format) {
+	case FORMAT_BARE:
+		needed_space = crc_size_bytes * crc_count;
+		break;
+	default:
+		needed_space = 0;
+		print_err("Unsupported CRC output format\n");
+		goto ret_err;
+	}
+	/* Add existing magic numbers to required space */
+	if (check_start_magic)
+		needed_space += 4u;
+	if (check_end_magic)
+		needed_space += 4u;
+
+	print_debug("Required space for %zu CRCs %s: %zu (available: %zu)\n",
+		    crc_count,
+		    (check_start_magic || check_end_magic ? "including magic values" : ""),
+		    needed_space,
+		    output_sec_data->d_size
+		    );
+	if (needed_space > output_sec_data->d_size) {
+		print_err("Not enough space in section. %zu bytes available but %zu needed\n",
+			  output_sec_data->d_size, needed_space);
+	}
+
+	/* Checks finished. Write data to output section */
+	if (format == FORMAT_BARE) {
+		if (check_start_magic)
+			sec_bytes += 4;
+
+		for (iter = section_name_list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
+			print_debug("Write CRC 0x%08x (%u bytes) for section %s\n", crcs[idx],
+				    (unsigned int)crc_size_bytes,
+				    iter->data);
+			write_crc_to_byte_array(sec_bytes, crcs[idx], crc_size_bytes, little_endian);
+			sec_bytes += crc_size_bytes;
+		}
+	}
+
+	/* Update ELF file */
+	if (ep->readonly) {
+		print_debug("DRY RUN: File will not be updated\n");
+		ret = 0;
+	} else {
+		if (elf_update(ep->elf, ELF_C_WRITE) < 0) {
+			print_err("Error writing ELF file: %s\n", elf_errmsg(-1));
+		} else {
+			ret = 0;
+		}
+	}
+
+ret_err:
+	return ret;
 }
 
 void elf_patch_close_and_free(elfpatch_handle_t *ep)
