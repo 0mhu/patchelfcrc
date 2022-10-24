@@ -117,6 +117,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	case 'O':
 		args->output_section = arg;
 		break;
+	case 'r':
+		args->crc.rev = true;
+		break;
+	case 's':
+		args->crc.start_value = strtoul(arg, NULL, 0);
+		break;
+	case 'x':
+		args->crc.xor = strtoul(arg, NULL, 0);
+		break;
 	case ARGP_KEY_ARG:
 		if (state->arg_num >= 1)
 			argp_usage(state);
