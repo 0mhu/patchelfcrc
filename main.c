@@ -103,6 +103,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 			args->granularity = GRANULARITY_16BIT;
 		else if  (!strcmp(arg, "word"))
 			args->granularity = GRANULARITY_32BIT;
+		else
+			argp_error(state, "Error parsing granularity: %s\n", arg);
+		break;
+	case 'F':
+		if (!strcmp(arg, "bare"))
+			args->format = FORMAT_BARE;
+		else if (!strcmp(arg, "struct"))
+			args->format = FORMAT_STRUCT;
+		else
+			argp_error(state, "Error parsing output format: %s\n", arg);
 		break;
 	case 'O':
 		args->output_section = arg;
@@ -389,7 +399,7 @@ int main(int argc, char **argv)
 		if (elf_patch_write_crcs_to_section(ep, cmd_opts.output_section, cmd_opts.section_list,
 					crcs, 32, cmd_opts.start_magic, cmd_opts.end_magic,
 					cmd_opts.has_start_magic, cmd_opts.has_end_magic,
-					FORMAT_BARE, cmd_opts.little_endian)) {
+					cmd_opts.format, cmd_opts.little_endian)) {
 			ret = -1;
 		}
 	}
