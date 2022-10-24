@@ -53,6 +53,14 @@ struct command_line_options {
 	const char *output_section;
 };
 
+/**
+ * @brief Parse command line options
+ * @param key Option key
+ * @param arg Argument passed
+ * @param state State of ARGP parser
+ * @return 0 No error
+ * @return ARGP_ERR_UNKNOWN in case of an unknown option
+ */
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
 	struct command_line_options *args = (struct command_line_options *)state->input;
@@ -324,6 +332,12 @@ static int compute_crcs(elfpatch_handle_t *ep, SlList *list, const struct comman
 	return ret;
 }
 
+/**
+ * @brief Debug-print the CRCs of sections in form of a table
+ * @param[in] list List of section names
+ * @param[in] crcs Array of CRCs.
+ * @note The array @p crcs must be at least as long as @p list
+ */
 static void print_crcs(SlList *list, const uint32_t *crcs)
 {
 	SlList *iter;

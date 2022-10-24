@@ -16,17 +16,30 @@
  */
 
 
-#ifndef _REPORTING_H_
-#define _REPORTING_H_
-
+#include <patchelfcrc/reporting.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdbool.h>
 
-#define print_err(fmt, ...) fprintf(stderr, "[ERR] " fmt, ## __VA_ARGS__);
+static bool global_verbosity_state = false;
 
-void print_debug(const char *fmt, ...);
+void print_debug(const char *fmt, ...)
+{
+	va_list va;
 
-void reporting_enable_verbose(void);
+	if (global_verbosity_state) {
+		va_start(va, fmt);
+		(void)vprintf(fmt, va);
+		va_end(va);
+	}
+}
 
-bool reporting_get_verbosity(void);
+void reporting_enable_verbose(void)
+{
+	global_verbosity_state = true;
+}
 
-#endif /* _REPORTING_H_ */
+bool reporting_get_verbosity(void)
+{
+	return global_verbosity_state;
+}

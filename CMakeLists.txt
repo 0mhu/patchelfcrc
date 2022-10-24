@@ -2,17 +2,32 @@ cmake_minimum_required(VERSION 3.5)
 
 project(patchelfcrc LANGUAGES C)
 
+if(NOT WIN32)
+  string(ASCII 27 Esc)
+  set(ColorReset "${Esc}[m")
+  set(ColorBold  "${Esc}[1m")
+  set(Red         "${Esc}[31m")
+  set(Green       "${Esc}[32m")
+  set(Yellow      "${Esc}[33m")
+  set(Blue        "${Esc}[34m")
+  set(Magenta     "${Esc}[35m")
+  set(Cyan        "${Esc}[36m")
+  set(White       "${Esc}[37m")
+  set(BoldRed     "${Esc}[1;31m")
+  set(BoldGreen   "${Esc}[1;32m")
+  set(BoldYellow  "${Esc}[1;33m")
+  set(BoldBlue    "${Esc}[1;34m")
+  set(BoldMagenta "${Esc}[1;35m")
+  set(BoldCyan    "${Esc}[1;36m")
+  set(BoldWhite   "${Esc}[1;37m")
+endif()
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ELF REQUIRED libelf)
 
-set (CFILES
-	main.c
-	version.c
-	named_crcs.c
-	crc.c
-	elfpatch.c
-	reporting.c
-)
+find_package(Doxygen)
+
+aux_source_directory("src" CFILES)
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")
 
@@ -38,4 +53,26 @@ target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/
 target_include_directories(${PROJECT_NAME} PRIVATE "include")
 add_dependencies(${PROJECT_NAME} version-header)
 
+if (DOXYGEN_FOUND)
+	set(DOXYFILE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxyfile.in")
+	set(DOXYFILE_DEST "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
+	configure_file(${DOXYFILE_SRC} ${DOXYFILE_DEST} @ONLY)
+	add_custom_target(doxygen
+		DEPENDS
+			doxygen-version-header
+		COMMAND
+			${DOXYGEN_EXECUTABLE} ${DOXYFILE_DEST}
+		WORKING_DIRECTORY
+			${CMAKE_CURRENT_SOURCE_DIR}
+	)
 
+	add_custom_target(doxygen-version-header
+		COMMAND
+			bash ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/gen-version-string.sh "${CMAKE_CURRENT_BINARY_DIR}/doxyversion.in"
+		WORKING_DIRECTORY
+			${CMAKE_CURRENT_SOURCE_DIR}
+	)
+else (DOXYGEN_FOUND)
+	message("${BoldMagenta}Doxygen needs to be installed to generate the doxygen documentation${ColorReset}")
+	message("${BoldMagenta}doxygen target will not be available${ColorReset}")
+endif (DOXYGEN_FOUND)

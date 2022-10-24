@@ -1,3 +1,25 @@
+/*
+ * This file is part of patchelfcrc.
+ * Copyright (c) 2022 Mario Hüttel.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 2 only.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * @file elfpatch.h
+ * @brief Header for ELF Patching Class
+ */
+
 #ifndef _ELFPATCH_H_
 #define _ELFPATCH_H_
 
@@ -28,6 +50,16 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly);
  */
 int elf_patch_check_for_section(elfpatch_handle_t *ep, const char *section);
 
+/**
+ * @brief Compute CRC over a section in an ELF file
+ * @param ep Elf patch object
+ * @param section Section name
+ * @param[out] crc CRC output
+ * @param granularity CRC calculation granularity
+ * @param little_endian memory layout is little endian
+ * @return 0 if successful
+ * @return negative if error
+ */
 int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *section, struct crc_calc *crc,
                                        enum granularity granularity, bool little_endian);
 
