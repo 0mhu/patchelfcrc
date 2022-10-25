@@ -8,7 +8,7 @@ arch=('i686' 'x86_64')
 url="https://git.shimatta.de/mhu/patchelfcrc"
 licence=('GPLv2')
 depends=('libelf')
-makedepends=('cmake' 'git')
+makedepends=('cmake' 'pandoc' 'git')
 provides=('patchelfcrc')
 source=("${pkgname}-git"::"git+https://git.shimatta.de/mhu/patchelfcrc" "git+https://git.shimatta.de/3rd-party/libfort.git" "git+https://git.shimatta.de/mhu/linklist-lib")
 sha1sums=('SKIP' 'SKIP' 'SKIP')
@@ -36,4 +36,5 @@ prepare () {
 
 package () {
 	install -Dm755 "$srcdir/$pkgname-git/build/patchelfcrc" "$pkgdir/usr/bin/patchelfcrc"
+	install -Dm644 "$srcdir/$pkgname-git/build/man/patchelfcrc.1.gz" "$pkgdir/use/share/man/man1/patchelfcrc.1.gz"
 }

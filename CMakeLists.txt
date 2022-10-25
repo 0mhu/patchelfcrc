@@ -27,6 +27,8 @@ pkg_check_modules(ELF REQUIRED libelf)
 
 find_package(Doxygen)
 
+add_subdirectory(man)
+
 aux_source_directory("src" CFILES)
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")

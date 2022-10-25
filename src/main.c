@@ -373,6 +373,11 @@ int main(int argc, char **argv)
 		reporting_enable_verbose();
 	print_verbose_start_info(&cmd_opts);
 
+	if (cmd_opts.list) {
+		list_predefined_crcs();
+		goto free_cmds;
+	}
+
 	/* Check if file has been supplied */
 	if (!cmd_opts.elf_path) {
 		print_err("No ELF file specified. Exiting...\n");
@@ -381,11 +386,6 @@ int main(int argc, char **argv)
 
 	if (!cmd_opts.output_section) {
 		print_err("No output section specified. Will continue but not patch file.\n");
-	}
-
-	if (cmd_opts.list) {
-		list_predefined_crcs();
-		goto free_cmds;
 	}
 
 	/* Do error printing if using a reversed polynomial. It is not implemented yet! */
