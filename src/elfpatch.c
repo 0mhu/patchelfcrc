@@ -232,6 +232,9 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 {
 	Elf_Kind ek;
 	const char *type_string = "unrecognized";
+	size_t header_count = 0ull;
+	GElf_Phdr phdr;
+	size_t i;
 
 	ret_val_if_ep_err(ep, -1001);
 
@@ -273,7 +276,19 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 		return -1;
 	}
 
+	/* Get program headers */
+	if ( elf_getphdrnum(ep->elf, &header_count) != 0) {
+		print_err("Error reading count of program headers: %s\n", elf_errmsg(-1));
+		return -1;
+	}
 
+	for (i = 0ull; i < header_count; i++) {
+		if (gelf_getphdr(ep->elf, (int)i, &phdr) != &phdr) {
+			print_err("Error reading program header (%zu): %s\n", i, elf_errmsg(-1));
+			return -1;
+		}
+		print_debug("Read program header %zu\n", i);
+	}
 
 	return 0;
 }
@@ -304,6 +319,9 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly)
 		print_err("[LIBELF] %s\n", elf_errmsg(-1));
 		goto close_fd;
 	}
+
+	/* Prewvent Libelf from relayouting the sections, which would brick the load segments */
+	elf_flagelf(ep->elf, ELF_C_SET, ELF_F_LAYOUT);
 
 	if (elf_patch_update_info(ep)) {
 		print_err("File malformatted. Cannot use for CRC patching\n");
