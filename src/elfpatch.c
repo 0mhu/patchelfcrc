@@ -637,6 +637,7 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	 * This is needed to to the forced memory layout
 	 */
 	elf_flagdata(output_sec_data, ELF_C_SET, ELF_F_DIRTY);
+	ret = 0;
 
 ret_err:
 	return ret;
