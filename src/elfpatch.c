@@ -633,17 +633,10 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 		}
 	}
 
-	/* Update ELF file */
-	if (ep->readonly) {
-		print_debug("DRY RUN: File will not be updated\n");
-		ret = 0;
-	} else {
-		if (elf_update(ep->elf, ELF_C_WRITE) < 0) {
-			print_err("Error writing ELF file: %s\n", elf_errmsg(-1));
-		} else {
-			ret = 0;
-		}
-	}
+	/* Flag section data as invalid to trigger rewrite.
+	 * This is needed to to the forced memory layout
+	 */
+	elf_flagdata(output_sec_data, ELF_C_SET, ELF_F_DIRTY);
 
 ret_err:
 	return ret;
@@ -652,6 +645,17 @@ ret_err:
 void elf_patch_close_and_free(elfpatch_handle_t *ep)
 {
 	ret_if_ep_err(ep);
+
+	if (ep->elf) {
+		/* Update ELF file */
+		if (ep->readonly) {
+			print_debug("DRY RUN: File will not be updated\n");
+		} else {
+			if (elf_update(ep->elf, ELF_C_WRITE) < 0) {
+				print_err("Error writing ELF file: %s\n", elf_errmsg(-1));
+			}
+		}
+	}
 
 	if (ep->elf)
 		elf_end(ep->elf);
