@@ -36,5 +36,5 @@ prepare () {
 
 package () {
 	install -Dm755 "$srcdir/$pkgname-git/build/patchelfcrc" "$pkgdir/usr/bin/patchelfcrc"
-	install -Dm644 "$srcdir/$pkgname-git/build/man/patchelfcrc.1.gz" "$pkgdir/use/share/man/man1/patchelfcrc.1.gz"
+	install -Dm644 "$srcdir/$pkgname-git/build/man/patchelfcrc.1.gz" "$pkgdir/usr/share/man/man1/patchelfcrc.1.gz"
 }
