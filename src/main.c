@@ -398,7 +398,7 @@ int main(int argc, char **argv)
 	elf_version(EV_CURRENT);
 
 	/* Open the ELF file */
-	ep = elf_patch_open(cmd_opts.elf_path, cmd_opts.dry_run);
+	ep = elf_patch_open(cmd_opts.elf_path, cmd_opts.dry_run, cmd_opts.little_endian);
 	if (!ep) {
 		ret = -2;
 		goto free_cmds;
