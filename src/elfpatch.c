@@ -482,6 +482,17 @@ static size_t calculate_needed_space_for_crcs(elfpatch_handle_t *ep,
 	return needed_space;
 }
 
+static void get_section_addr_and_length(const struct elf_section *sec, uint64_t *vma, uint64_t *len)
+{
+	if (!sec)
+		return;
+
+	if (vma)
+		*vma = sec->section_header.sh_addr;
+	if (len)
+		*len = sec->section_header.sh_size;
+}
+
 int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, const SlList *section_name_list,
 				    const uint32_t *crcs, uint8_t crc_size_bits, uint32_t start_magic, uint32_t end_magic,
 				    bool check_start_magic, bool check_end_magic, enum crc_format format, bool little_endian)
@@ -672,4 +683,22 @@ void elf_patch_close_and_free(elfpatch_handle_t *ep)
 	ep->fd = 0;
 
 	free(ep);
+}
+
+int elf_patch_get_section_address(elfpatch_handle_t *ep, const char *section,
+				  uint64_t *vma, uint64_t *len)
+{
+	const struct elf_section *sec;
+
+	ret_val_if_ep_err(ep, -1001);
+	if (!section)
+		return -1002;
+
+	sec = find_section_in_list(ep->sections, section);
+	if (!sec)
+		return -1;
+
+	get_section_addr_and_length(sec, vma, len);
+
+	return 0;
 }

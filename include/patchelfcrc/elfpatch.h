@@ -51,6 +51,19 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly);
 int elf_patch_check_for_section(elfpatch_handle_t *ep, const char *section);
 
 /**
+ * @brief Get VMA, LMA and size of section
+ * @param ep Elfpatch handle
+ * @param[in] section section name
+ * @param[out] vma Virtual Memory Address. May be NULL.
+ * @param[out] len Size of section in bytes. May be NULL.
+ * @return 0 if successful
+ * @return -1 if section is not found
+ * @return -1000 and below: Parameter error.
+ */
+int elf_patch_get_section_address(elfpatch_handle_t *ep, const char *section,
+                                  uint64_t *vma, uint64_t *len);
+
+/**
  * @brief Compute CRC over a section in an ELF file
  * @param ep Elf patch object
  * @param section Section name

@@ -27,6 +27,7 @@
 #include <linklist-lib/singly-linked-list.h>
 #include <patchelfcrc/reporting.h>
 #include <patchelfcrc/elfpatch.h>
+#include <patchelfcrc/xml.h>
 #include <fort.h>
 
 const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] com>";
@@ -35,6 +36,8 @@ const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] co
 #define ARG_KEY_START_MAGIC (2)
 #define ARG_KEY_END_MAGIC (3)
 #define ARG_KEY_LIST (4)
+#define ARG_KEY_EXPORT (5)
+#define ARG_KEY_IMPORT (6)
 
 struct command_line_options {
 	bool little_endian;
@@ -51,6 +54,8 @@ struct command_line_options {
 	SlList *section_list;
 	const char *elf_path;
 	const char *output_section;
+	const char *export_xml;
+	const char *import_xml;
 };
 
 /**
@@ -79,6 +84,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	case ARG_KEY_END_MAGIC:
 		args->has_end_magic = true;
 		args->end_magic = strtoul(arg, NULL, 0);
+		break;
+	case ARG_KEY_EXPORT:
+		args->export_xml = arg;
+		break;
+	case ARG_KEY_IMPORT:
+		args->import_xml = arg;
 		break;
 	case ARG_KEY_LIST:
 		args->list = true;
@@ -144,7 +155,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 
-
 	return 0;
 }
 
@@ -170,7 +180,9 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 		{"crc-format", 'F', "FORMAT", 0, "Output Format for CRCs.", 2},
 		{"start-magic", ARG_KEY_START_MAGIC, "STARTMAGIC", 0, "Check output section for start magic (uint32)", 2},
 		{"end-magic", ARG_KEY_END_MAGIC, "STARTMAGIC", 0, "Check output section for start magic (uint32)", 2},
-		{"list-crcs", ARG_KEY_LIST, 0, 0 , "List predefined CRCs", 0},
+		{"list-crcs", ARG_KEY_LIST, 0, 0, "List predefined CRCs", 0},
+		{"export", ARG_KEY_EXPORT, "XML", 0, "Export CRCs to XML file", 3},
+		{"import", ARG_KEY_IMPORT, "XML", 0, "Do not caclulate CRCs but import them from file", 3},
 		/* Sentinel */
 		{NULL, 0, 0, 0, NULL, 0}
 	};
@@ -205,6 +217,8 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->section_list = NULL;
 	opts->elf_path = NULL;
 	opts->output_section = NULL;
+	opts->export_xml = NULL;
+	opts->import_xml = NULL;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
@@ -239,6 +253,14 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 
 	if (cmd_opts->output_section) {
 		print_debug("Output section: %s\n", cmd_opts->output_section);
+	}
+
+	if (cmd_opts->export_xml) {
+		print_debug("Export CRCs to '%s'\n", cmd_opts->export_xml);
+	}
+
+	if (cmd_opts->import_xml) {
+		print_debug("Import CRCs from '%s'\n", cmd_opts->import_xml);
 	}
 
 	if (cmd_opts->section_list) {
@@ -329,6 +351,7 @@ static int compute_crcs(elfpatch_handle_t *ep, SlList *list, const struct comman
 		crcs[idx] = crc_get_value(crc);
 	}
 
+	crc_destroy(crc);
 	return ret;
 }
 
@@ -366,6 +389,8 @@ int main(int argc, char **argv)
 	int ret = 0;
 	uint32_t *crcs;
 
+	xml_init();
+
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
 
@@ -384,8 +409,13 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if (!cmd_opts.output_section) {
-		print_err("No output section specified. Will continue but not patch file.\n");
+	if (cmd_opts.export_xml && cmd_opts.import_xml) {
+		print_err("XML export and input cannot be specified at the same time.");
+		return -2;
+	}
+
+	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL) {
+		print_err("No output section / XML export specified. Will continue but not create any output\n");
 	}
 
 	/* Do error printing if using a reversed polynomial. It is not implemented yet! */
@@ -420,15 +450,22 @@ int main(int argc, char **argv)
 
 	if (cmd_opts.output_section) {
 		if (elf_patch_write_crcs_to_section(ep, cmd_opts.output_section, cmd_opts.section_list,
-					crcs, 32, cmd_opts.start_magic, cmd_opts.end_magic,
+					crcs, crc_len_from_poly(cmd_opts.crc.polynomial),
+					cmd_opts.start_magic, cmd_opts.end_magic,
 					cmd_opts.has_start_magic, cmd_opts.has_end_magic,
 					cmd_opts.format, cmd_opts.little_endian)) {
 			ret = -1;
 		}
 	}
 
+	if (cmd_opts.export_xml) {
+		xml_write_crcs_to_file(cmd_opts.export_xml, crcs, cmd_opts.section_list, &cmd_opts.crc, ep);
+	}
+
 	elf_patch_close_and_free(ep);
 
+	/* Free the CRCs. This is not strictly necessary... */
+	free(crcs);
 free_cmds:
 
 	free_cmd_args(&cmd_opts);

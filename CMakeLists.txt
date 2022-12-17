@@ -26,6 +26,7 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(ELF REQUIRED libelf)
 
 find_package(Doxygen)
+find_package(LibXml2 REQUIRED)
 
 add_subdirectory(man)
 
@@ -47,9 +48,11 @@ set(FORT_ENABLE_TESTING OFF CACHE INTERNAL "")
 add_subdirectory(3rdparty/libfort)
 add_subdirectory(linklist-lib)
 
+include_directories(${LIBXML2_INCLUDE_DIRS})
+
 add_executable(${PROJECT_NAME} ${CFILES})
-target_link_libraries(${PROJECT_NAME} ${ELF_LIBRARIES} fort linklist-lib)
-target_link_directories(${PROJECT_NAME} PRIVATE ${ELF_LIBRARY_DIRS})
+target_link_libraries(${PROJECT_NAME} ${ELF_LIBRARIES} ${LIBXML2_LIBRARIES} fort linklist-lib)
+target_link_directories(${PROJECT_NAME} PRIVATE ${ELF_LIBRARY_DIRS} ${LIBXML2_LIBRARY_DIRS})
 target_include_directories(${PROJECT_NAME} PRIVATE ${ELF_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "include")
