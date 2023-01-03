@@ -40,7 +40,17 @@ add_custom_target(
 		mkdir -p ${GEN_HEADER_PATH} && bash "${CMAKE_CURRENT_SOURCE_DIR}/gen_version_header.sh" "${GEN_HEADER_PATH}/version.h"
 	WORKING_DIRECTORY
 		${CMAKE_CURRENT_SOURCE_DIR}
+	COMMENT "Generating version header"
 	)
+
+add_custom_target(schema-header DEPENDS "${GEN_HEADER_PATH}/schema-blob.h")
+add_custom_command(
+	OUTPUT "${GEN_HEADER_PATH}/schema-blob.h"
+	COMMAND mkdir -p ${GEN_HEADER_PATH} && bash -c "xxd -i schema.xsd>${GEN_HEADER_PATH}/schema-blob.h"
+	DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resources/schema.xsd"
+	WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+	COMMENT "Generating XML schema"
+)
 
 add_compile_options(-Wall -Wextra -Wold-style-declaration -Wuninitialized -Wmaybe-uninitialized -Wunused-parameter)
 
@@ -56,7 +66,7 @@ target_link_directories(${PROJECT_NAME} PRIVATE ${ELF_LIBRARY_DIRS} ${LIBXML2_LI
 target_include_directories(${PROJECT_NAME} PRIVATE ${ELF_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "include")
-add_dependencies(${PROJECT_NAME} version-header)
+add_dependencies(${PROJECT_NAME} version-header schema-header)
 
 if (DOXYGEN_FOUND)
 	set(DOXYFILE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxyfile.in")

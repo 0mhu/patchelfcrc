@@ -702,3 +702,24 @@ int elf_patch_get_section_address(elfpatch_handle_t *ep, const char *section,
 
 	return 0;
 }
+
+int elf_patch_get_bits(elfpatch_handle_t *ep)
+{
+	int bitsize;
+
+	ret_val_if_ep_err(ep, -1001);
+
+	switch (ep->class) {
+	case ELFCLASS32:
+		bitsize = 32;
+		break;
+	case ELFCLASS64:
+		bitsize = 64;
+		break;
+	default:
+		bitsize = -1;
+		break;
+	}
+
+	return bitsize;
+}

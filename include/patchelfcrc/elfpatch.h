@@ -51,6 +51,14 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly);
 int elf_patch_check_for_section(elfpatch_handle_t *ep, const char *section);
 
 /**
+ * @brief Get bit size of opened elf file
+ * @param ep Elfpath handle
+ * @return positive: Bits of ELF file. Either 32 or 64
+ * @return negative, if error
+ */
+int elf_patch_get_bits(elfpatch_handle_t *ep);
+
+/**
  * @brief Get VMA, LMA and size of section
  * @param ep Elfpatch handle
  * @param[in] section section name

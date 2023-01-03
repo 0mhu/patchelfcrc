@@ -459,9 +459,14 @@ int main(int argc, char **argv)
 	}
 
 	if (cmd_opts.export_xml) {
-		xml_write_crcs_to_file(cmd_opts.export_xml, crcs, cmd_opts.section_list, &cmd_opts.crc, ep);
-	}
+		if (xml_write_crcs_to_file(cmd_opts.export_xml, crcs, cmd_opts.section_list, &cmd_opts.crc, ep)) {
+			print_err("Error during XML generation\n");
+			ret = -3;
+		}
+		/* Fix this: */
+		(void)xml_import_from_file(cmd_opts.export_xml);
 
+	}
 	elf_patch_close_and_free(ep);
 
 	/* Free the CRCs. This is not strictly necessary... */
