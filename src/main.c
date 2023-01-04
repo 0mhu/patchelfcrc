@@ -439,7 +439,7 @@ int main(int argc, char **argv)
 	elf_version(EV_CURRENT);
 
 	/* Open the ELF file */
-	ep = elf_patch_open(cmd_opts.elf_path, cmd_opts.dry_run);
+	ep = elf_patch_open(cmd_opts.elf_path, cmd_opts.dry_run, cmd_opts.little_endian);
 	if (!ep) {
 		ret = -2;
 		goto free_cmds;
@@ -448,12 +448,14 @@ int main(int argc, char **argv)
 	/* Check if all sections are present */
 	if (check_all_sections_present(ep, cmd_opts.section_list)) {
 		ret = -2;
-		goto free_cmds;
+		goto ret_close_elf;
 	}
 
 	/* Compute CRCs over sections */
 	crcs = (uint32_t *)malloc(sl_list_length(cmd_opts.section_list) * sizeof(uint32_t));
-	compute_crcs(ep, cmd_opts.section_list, &cmd_opts, crcs);
+	if (compute_crcs(ep, cmd_opts.section_list, &cmd_opts, crcs)) {
+		goto ret_close_elf;
+	}
 
 	if (reporting_get_verbosity()) {
 		print_crcs(cmd_opts.section_list, crcs);
@@ -478,12 +480,13 @@ int main(int argc, char **argv)
 		(void)xml_import_from_file(cmd_opts.export_xml);
 
 	}
+
+ret_close_elf:
 	elf_patch_close_and_free(ep);
 
 	/* Free the CRCs. This is not strictly necessary... */
 	free(crcs);
 free_cmds:
-
 	free_cmd_args(&cmd_opts);
 
 	return ret;

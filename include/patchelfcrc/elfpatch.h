@@ -41,7 +41,7 @@ enum crc_format {
     FORMAT_STRUCT,
 };
 
-elfpatch_handle_t *elf_patch_open(const char *path, bool readonly);
+elfpatch_handle_t *elf_patch_open(const char *path, bool readonly, bool expect_little_endian);
 
 /**
  * @brief Check if a section is present in file

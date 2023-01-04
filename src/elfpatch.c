@@ -232,9 +232,6 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 {
 	Elf_Kind ek;
 	const char *type_string = "unrecognized";
-	size_t header_count = 0ull;
-	GElf_Phdr phdr;
-	size_t i;
 
 	ret_val_if_ep_err(ep, -1001);
 
@@ -276,26 +273,13 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 		return -1;
 	}
 
-	/* Get program headers */
-	if ( elf_getphdrnum(ep->elf, &header_count) != 0) {
-		print_err("Error reading count of program headers: %s\n", elf_errmsg(-1));
-		return -1;
-	}
-
-	for (i = 0ull; i < header_count; i++) {
-		if (gelf_getphdr(ep->elf, (int)i, &phdr) != &phdr) {
-			print_err("Error reading program header (%zu): %s\n", i, elf_errmsg(-1));
-			return -1;
-		}
-		print_debug("Read program header %zu\n", i);
-	}
-
 	return 0;
 }
 
-elfpatch_handle_t *elf_patch_open(const char *path, bool readonly)
+elfpatch_handle_t *elf_patch_open(const char *path, bool readonly, bool expect_little_endian)
 {
 	struct elfpatch *ep;
+	const char *ident;
 
 	/* This is important to guarantee structure packing behavior */
 	CRC_OUT_CHECK_STRUCT_SIZES;
@@ -320,12 +304,33 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly)
 		goto close_fd;
 	}
 
-	/* Prewvent Libelf from relayouting the sections, which would brick the load segments */
+	/* Prevent Libelf from relayouting the sections, which would brick the load segments */
 	elf_flagelf(ep->elf, ELF_C_SET, ELF_F_LAYOUT);
 
 	if (elf_patch_update_info(ep)) {
 		print_err("File malformatted. Cannot use for CRC patching\n");
 		goto close_elf;
+	}
+
+	ident = elf_getident(ep->elf, NULL);
+	if (ident) {
+		switch (ident[5]) {
+		case 1:
+			print_debug("ELF Endianess: little\n");
+			if (!expect_little_endian) {
+				print_err("Big endian format expected. File is little endian. Double check settings!\n");
+			}
+			break;
+		case 2:
+			print_debug("ELF Endianess: big\n");
+			if (expect_little_endian) {
+				print_err("Little endian format expected. File is big endian. Double check settings!\n");
+			}
+			break;
+		default:
+			print_err("Cannot determine endianess of ELF file. EI_DATA is: %d\n", ident[5]);
+			break;
+		}
 	}
 
 	return (elfpatch_handle_t *)ep;
@@ -418,8 +423,16 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 	}
 
 	print_debug("Section data length: %lu\n", data->d_size);
-	if (!data->d_size)
+	if (!data->d_size) {
 		print_err("Section %s contains no data.\n", section);
+		return -2;
+	}
+
+	/* NOBIT sections have a length but no data in the file. Abort in this case */
+	if (!data->d_buf) {
+		print_err("Section %s does not contain loadable data.\n", section);
+		return -2;
+	}
 
 	/* If big endian or granularity is byte, simply compute CRC. No reordering is necessary */
 	if (!little_endian || granularity == GRANULARITY_BYTE) {
@@ -532,6 +545,11 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	/* Get data object of section */
 	output_sec_data = elf_getdata(output_section->scn, NULL);
 	sec_bytes = (uint8_t *)output_sec_data->d_buf;
+	if (!sec_bytes) {
+		print_err("Output section '%s' does not contain loadable data. It has to be allocated in the ELF file\n",
+			  section);
+		goto ret_err;
+	}
 
 	/* Check the start and end magics */
 	if (check_start_magic) {
@@ -645,7 +663,7 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	}
 
 	/* Flag section data as invalid to trigger rewrite.
-	 * This is needed to to the forced memory layout
+	 * This is needed due to the forced memory layout
 	 */
 	elf_flagdata(output_sec_data, ELF_C_SET, ELF_F_DIRTY);
 	ret = 0;
