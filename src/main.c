@@ -364,7 +364,7 @@ int main(int argc, char **argv)
 	struct command_line_options cmd_opts;
 	elfpatch_handle_t *ep;
 	int ret = 0;
-	uint32_t *crcs;
+	uint32_t *crcs = NULL;
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
@@ -431,10 +431,13 @@ int main(int argc, char **argv)
 
 ret_close_elf:
 	elf_patch_close_and_free(ep);
-
 free_cmds:
 
 	free_cmd_args(&cmd_opts);
+
+	/* Free CRCs if necessary */
+	if (crcs)
+		free(crcs);
 
 	return ret;
 }
