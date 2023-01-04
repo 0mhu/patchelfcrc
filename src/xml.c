@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <patchelfcrc/reporting.h>
@@ -155,8 +156,8 @@ ret_none:
  * @param xpath_ctx Context
  * @param required Print error if not found
  * @return NULL in case of error
- * @return pointer to newly alloceted string data.
- * @note Pointers retured from this function must be freed using xmlFree()
+ * @return pointer to newly allocated string data.
+ * @note Pointers returned from this function must be freed using xmlFree()
  */
 static const char *get_node_content_from_xpath(const char *path, xmlXPathContextPtr xpath_ctx, bool required)
 {
@@ -276,15 +277,53 @@ static int get_uint32_from_xpath_content(const char *xpath, xmlXPathContextPtr x
 	return ret;
 }
 
+int get_uint64_from_node_attribute(xmlNodePtr node, const char *attr, uint64_t *output)
+{
+	xmlChar *data;
+	uint64_t num;
+	int ret = -1;
+
+	data = xmlGetProp(node, BAD_CAST attr);
+	if (data) {
+		if (!convert_number_string_to_uint((const char *)data, &num)) {
+			ret = 0;
+			*output = num;
+		}
+		xmlFree(data);
+	}
+
+	return ret;
+}
+
+int get_uint32_from_node_attribute(xmlNodePtr node, const char *attr, uint32_t *output)
+{
+	int ret;
+	uint64_t tmp = 0;
+
+	ret = get_uint64_from_node_attribute(node, attr, &tmp);
+
+	if (tmp > UINT32_MAX || ret) {
+		print_err("Cannot conver attribute %s to number\n", attr);
+		ret = -1;
+	} else {
+		*output = (uint32_t)tmp;
+	}
+
+	return ret;
+}
 
 struct xml_crc_import *xml_import_from_file(const char *path)
 {
 	struct xml_crc_import *ret = NULL;
+	struct xml_crc_entry *crc;
 	xmlDocPtr doc;
-	xmlNodePtr root_node, settings_node, crc_node, iter;
+	xmlNodePtr root_node;
+	xmlNodePtr current_node;
 	xmlXPathContextPtr xpath_ctx = NULL;
+	xmlXPathObjectPtr xpath_obj = NULL;
 	uint64_t tmp_num64 = 0;
 	uint32_t tmp_num32 = 0;
+	int i;
 	const char *cptr;
 
 	if (!path)
@@ -312,6 +351,17 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 		goto ret_close_doc;
 	}
 
+	/* Get the version number and print error in case of incompatibility. Continue either way */
+	cptr = (char *)xmlGetProp(root_node, BAD_CAST "version");
+	if (cptr) {
+		if (strncmp(cptr, version_string, strlen(version_string)) != 0) {
+			print_err("XML file was generated with another version of patchelfcrc.\n");
+			print_err("\t XML shows: %s\n", cptr);
+			print_err("\t Program version: %s\n", version_string);
+		}
+		xmlFree((char *)cptr);
+	}
+
 	/* Allocate xml import structure */
 	ret = xml_crc_import_alloc();
 	if (!ret)
@@ -336,14 +386,35 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 		ret->crc_config.rev = false;
 	}
 
+	(void)get_uint32_from_xpath_content("/patchelfcrc/settings/elfclass", xpath_ctx, &tmp_num32, true);
+	ret->elf_bits = (int)tmp_num32;
 
-	goto ret_close_doc;
+	/* Get all CRCs */
+	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/patchelfcrc/sections/crc", xpath_ctx);
+	if (xmlXPathNodeSetIsEmpty(xpath_obj->nodesetval)) {
+		print_err("Internal error during read\n")
+		xml_crc_import_free(ret);
+		ret = NULL;
+		goto ret_close_doc;
+	}
 
-ret_dealloc:
-	xml_crc_import_free(ret);
-	ret = NULL;
+	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
+		current_node = xpath_obj->nodesetval->nodeTab[i];
+		crc = (struct xml_crc_entry *)malloc(sizeof(struct xml_crc_entry));
+		ret->xml_crc_entries = sl_list_append(ret->xml_crc_entries, crc);
+
+		get_uint64_from_node_attribute(current_node, "vma", &tmp_num64);
+		printf("vma: %x\n", (uint32_t)tmp_num64);
+		get_uint64_from_node_attribute(current_node, "size", &tmp_num64);
+		printf("size: %x\n", (uint32_t)tmp_num64);
+
+	}
+
 
 ret_close_doc:
+
+	if (xpath_obj)
+		xmlXPathFreeObject(xpath_obj);
 	if (xpath_ctx)
 		xmlXPathFreeContext(xpath_ctx);
 
