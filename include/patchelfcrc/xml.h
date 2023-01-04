@@ -37,4 +37,9 @@ struct xml_crc_import *xml_import_from_file(const char *path);
  */
 void xml_crc_import_free(struct xml_crc_import *data);
 
+/**
+ * @brief Print XML XSD file to stdout
+ */
+void xml_print_xsd(void);
+
 #endif /* _ELFPATCHCRC_XML_H_ */

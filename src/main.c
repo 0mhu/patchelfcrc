@@ -38,11 +38,13 @@ const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] co
 #define ARG_KEY_LIST (4)
 #define ARG_KEY_EXPORT (5)
 #define ARG_KEY_IMPORT (6)
+#define ARG_KEY_XSD (7)
 
 struct command_line_options {
 	bool little_endian;
 	bool dry_run;
 	bool verbose;
+	bool print_xsd;
 	enum granularity granularity;
 	enum crc_format format;
 	struct crc_settings crc;
@@ -93,6 +95,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case ARG_KEY_LIST:
 		args->list = true;
+		break;
+	case ARG_KEY_XSD:
+		args->print_xsd = true;
 		break;
 	case 'p':
 		/* Polyniomial */
@@ -183,6 +188,7 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 		{"list-crcs", ARG_KEY_LIST, 0, 0, "List predefined CRCs", 0},
 		{"export", ARG_KEY_EXPORT, "XML", 0, "Export CRCs to XML file", 3},
 		{"import", ARG_KEY_IMPORT, "XML", 0, "Do not caclulate CRCs but import them from file", 3},
+		{"xsd", ARG_KEY_XSD, 0, 0, "Print XSD to stdout", 0},
 		/* Sentinel */
 		{NULL, 0, 0, 0, NULL, 0}
 	};
@@ -204,6 +210,7 @@ static void prepare_default_opts(struct command_line_options *opts)
 {
 	opts->little_endian = false;
 	opts->verbose = false;
+	opts->print_xsd = false;
 	opts->granularity = GRANULARITY_BYTE;
 	opts->dry_run = false;
 	opts->crc.xor = 0UL;
@@ -393,6 +400,10 @@ int main(int argc, char **argv)
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
+	if (cmd_opts.print_xsd) {
+		xml_print_xsd();
+		goto free_cmds;
+	}
 
 	if (cmd_opts.verbose || cmd_opts.dry_run)
 		reporting_enable_verbose();

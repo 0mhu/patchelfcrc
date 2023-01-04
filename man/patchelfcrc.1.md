@@ -8,7 +8,7 @@
 # SYNOPSYS
 **patchelfcrc** [**-lrv?V**] [**-g** *GRANULARITY*] [**-p** *POLYNOMIAL*] [**-s** *STARTVALUE*]
 [**-x** *XORVAL*] [**-F** *FORMAT*] [**-O** *OUTPUTSECTION*] [**-S** *SEC*]
-[**\--granularity**=*GRANULARITY*] [**\--little-endian**] [**\--dry-run**]
+[**\--granularity**=*GRANULARITY*] [**\--little-endian**] [**\--dry-run**] [**\--xsd**]
 [**\--poly**=*POLYNOMIAL*] [**\--reversed**] [**\--start-value**=*STARTVALUE*]
 [**--verbose**] [**\--xor-out**=*XORVAL*] [**\--end-magic**=*MAGIC*]
 [**\--crc-format**=*FORMAT*] [**\--list-crcs**] [**\--output-section**=*OUTPUTSECTION*]
@@ -64,6 +64,12 @@
 
 **-V**, **\--version**
 : Print version number
+
+**\--list-crcs**
+: List the possible predefined CRCs
+
+**\--xsd**
+: Print the XSD file used to validate the XML import to stdout
 
 **--usage**
 : Print usage hints on command line options.

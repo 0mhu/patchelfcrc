@@ -230,3 +230,8 @@ void xml_crc_import_free(struct xml_crc_import *data)
 	data->xml_crc_entries = NULL;
 	free(data);
 }
+
+void xml_print_xsd(void)
+{
+	printf("%.*s", schema_xsd_len, schema_xsd);
+}
