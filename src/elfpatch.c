@@ -423,8 +423,16 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 	}
 
 	print_debug("Section data length: %lu\n", data->d_size);
-	if (!data->d_size)
+	if (!data->d_size) {
 		print_err("Section %s contains no data.\n", section);
+		return -2;
+	}
+
+	/* NOBIT sections have a length but no data in the file. Abort in this case */
+	if (!data->d_buf) {
+		print_err("Section %s does not contain loadable data.\n", section);
+		return -2;
+	}
 
 	/* If big endian or granularity is byte, simply compute CRC. No reordering is necessary */
 	if (!little_endian || granularity == GRANULARITY_BYTE) {
