@@ -395,6 +395,7 @@ int main(int argc, char **argv)
 	elfpatch_handle_t *ep;
 	int ret = 0;
 	uint32_t *crcs = NULL;
+	struct xml_crc_import *import_data = NULL;
 
 	xml_init();
 
@@ -477,7 +478,7 @@ int main(int argc, char **argv)
 			ret = -3;
 		}
 		/* Fix this: */
-		(void)xml_import_from_file(cmd_opts.export_xml);
+		import_data = xml_import_from_file(cmd_opts.export_xml);
 
 	}
 
@@ -490,6 +491,8 @@ free_cmds:
 	/* Free CRCs if necessary */
 	if (crcs)
 		free(crcs);
+	if (import_data)
+		xml_crc_import_free(import_data);
 
 	return ret;
 }

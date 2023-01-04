@@ -1,4 +1,5 @@
 #include <libxml/parser.h>
+#include <libxml/xpath.h>
 #include <libxml/xmlIO.h>
 #include <libxml/xinclude.h>
 #include <libxml/tree.h>
@@ -7,6 +8,8 @@
 #include <libxml/xmlreader.h>
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <patchelfcrc/reporting.h>
 #include <patchelfcrc/xml.h>
@@ -106,33 +109,6 @@ static struct xml_crc_import *xml_crc_import_alloc(void)
 	return ret;
 }
 
-static void recusive_node_iter(xmlNodePtr node, int level)
-{
-	int i;
-	xmlNodePtr iter;
-	xmlAttrPtr attr;
-	xmlChar *t;
-
-	for (i = level; i > 0; i--)
-		printf("    ");
-
-	if (node->content)
-		printf("Node <%s> (%d) >%s<", node->name, node->type, node->content);
-	else
-		printf("Node <%s> (%d)", node->name, node->type);
-	if (node->properties) {
-		for (attr = node->properties; attr; attr = attr->next) {
-			t = xmlNodeListGetString(node->doc, attr->children, 1);
-			printf(" %s=\"%s\"", attr->name, t);
-			xmlFree(t);
-		}
-	}
-	printf("\n");
-	for (iter = node->children; iter; iter = iter->next) {
-		recusive_node_iter(iter, level + 1);
-	}
-}
-
 static bool validate_xml_doc(xmlDocPtr doc)
 {
 	bool ret = false;
@@ -173,11 +149,143 @@ ret_none:
 	return ret;
 }
 
+/**
+ * @brief Get the content of a node specified by the xpath \p path
+ * @param path Xpath to search for
+ * @param xpath_ctx Context
+ * @param required Print error if not found
+ * @return NULL in case of error
+ * @return pointer to newly alloceted string data.
+ * @note Pointers retured from this function must be freed using xmlFree()
+ */
+static const char *get_node_content_from_xpath(const char *path, xmlXPathContextPtr xpath_ctx, bool required)
+{
+	xmlXPathObjectPtr xpath_obj;
+	const char *ret = NULL;
+
+	xpath_obj = xmlXPathEvalExpression(BAD_CAST path, xpath_ctx);
+	if (xpath_obj) {
+		if (xmlXPathNodeSetIsEmpty(xpath_obj->nodesetval)) {
+			if (required)
+				print_err("Required XML path %s not found.\n", path);
+
+		} else {
+			ret = (const char *)xmlNodeGetContent(xpath_obj->nodesetval->nodeTab[0]);
+		}
+		xmlXPathFreeObject(xpath_obj);
+	} else {
+		/* Error */
+		print_err("Error searching for path %s in XML. This is an error. Report this.\n", path);
+	}
+
+	return ret;
+}
+
+
+/**
+ * @brief Convert a number string (either prefixed 0x hex or decimal) to a uint64
+ *
+ * In case of an error, the \p output remains untouched
+ *
+ * @param[in] data input data. 0 terminated
+ * @param[in] output Converted number.
+ * @return 0 if okay
+ * @return negative in case of error
+ */
+static int convert_number_string_to_uint(const char *data, uint64_t *output)
+{
+	int ret = -1;
+	uint64_t num;
+	char *endptr;
+
+	if (!data || !output)
+		return -1000;
+
+	errno = 0;
+	num = strtoull(data, &endptr, 0);
+	if (endptr == data) {
+		/* Error finding number */
+		print_err("Data %s in XML is not a valid number\n", data);
+	} else if (errno == ERANGE) {
+		print_err("Data %s in XML overflowed\n", data);
+	} else if (errno == EINVAL) {
+		print_err("Unspecified error converting '%s' to a number\n", data);
+	} else if (errno == 0 && data && *endptr != '\0') {
+		print_err("Data '%s' could not be fully parsed to a number. Part '%s' is irritating\n", data, endptr);
+	} else if (errno == 0 && data && *endptr == '\0') {
+		ret = 0;
+		*output = num;
+	}
+
+	return ret;
+}
+
+/**
+ * @brief Get the content of an xpath and convert it to a uint64_t
+ * @param[in] xpath Path to get content from
+ * @param[in] xpath_ctx Xpath context
+ * @param[out] output Number output. Remains untouched in case of an error
+ * @param required This xpath is required. Will turn on error reporting if it is not found.
+ * @return 0 if successful
+ * @return negative in case of an error
+ */
+static int get_uint64_from_xpath_content(const char *xpath, xmlXPathContextPtr xpath_ctx, uint64_t *output, bool required)
+{
+	const char *data;
+	int ret = -1;
+
+	data = get_node_content_from_xpath(xpath, xpath_ctx, required);
+	if (data) {
+		ret = convert_number_string_to_uint(data, output);
+		xmlFree((void *)data);
+	}
+
+	return ret;
+}
+
+/**
+ * @brief Get the content of an xpath and convert it to a uint64_t
+ * @param[in] xpath Path to get content from
+ * @param[in] xpath_ctx Xpath context
+ * @param[out] output Number output. Remains untouched in case of an error
+ * @param required This xpath is required. Will turn on error reporting if it is not found.
+ * @return 0 if successful
+ * @return negative in case of an error
+ */
+static int get_uint32_from_xpath_content(const char *xpath, xmlXPathContextPtr xpath_ctx, uint32_t *output, bool required)
+{
+	const char *data;
+	uint64_t tmp;
+	int ret = -1;
+
+	data = get_node_content_from_xpath(xpath, xpath_ctx, required);
+	if (data) {
+		ret = convert_number_string_to_uint(data, &tmp);
+		xmlFree((void *)data);
+
+		if (ret == 0) {
+			if (tmp > UINT32_MAX) {
+				ret = -2;
+				print_err("Value in XML file at path '%s' is too large for uint32_t\n", xpath);
+			} else {
+				*output = (uint32_t)tmp;
+			}
+		}
+	}
+
+	return ret;
+}
+
+
 struct xml_crc_import *xml_import_from_file(const char *path)
 {
 	struct xml_crc_import *ret = NULL;
 	xmlDocPtr doc;
 	xmlNodePtr root_node, settings_node, crc_node, iter;
+	xmlXPathContextPtr xpath_ctx = NULL;
+	uint64_t tmp_num64 = 0;
+	uint32_t tmp_num32 = 0;
+	const char *cptr;
 
 	if (!path)
 		return NULL;
@@ -198,15 +306,47 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 		goto ret_close_doc;
 	}
 
+	/* Get xpath context */
+	xpath_ctx = xmlXPathNewContext(doc);
+	if (!xpath_ctx) {
+		goto ret_close_doc;
+	}
+
 	/* Allocate xml import structure */
 	ret = xml_crc_import_alloc();
 	if (!ret)
 		goto ret_close_doc;
 
-	recusive_node_iter(root_node, 0);
 
+	/* Do not do extensive error handling. It is assured by the schema that the numbers are parsable */
+	(void)get_uint64_from_xpath_content("/patchelfcrc/settings/poly", xpath_ctx, &tmp_num64, true);
+	ret->crc_config.polynomial = tmp_num64;
+
+	(void)get_uint32_from_xpath_content("/patchelfcrc/settings/start", xpath_ctx, &tmp_num32, true);
+	ret->crc_config.start_value = tmp_num32;
+
+	(void)get_uint32_from_xpath_content("/patchelfcrc/settings/xor", xpath_ctx, &tmp_num32, true);
+	ret->crc_config.xor = tmp_num32;
+
+	cptr = get_node_content_from_xpath("/patchelfcrc/settings/rev", xpath_ctx, false);
+	if (cptr) {
+		xmlFree((void *)cptr);
+		ret->crc_config.rev = true;
+	} else {
+		ret->crc_config.rev = false;
+	}
+
+
+	goto ret_close_doc;
+
+ret_dealloc:
+	xml_crc_import_free(ret);
+	ret = NULL;
 
 ret_close_doc:
+	if (xpath_ctx)
+		xmlXPathFreeContext(xpath_ctx);
+
 	/* Free document and all of its children */
 	xmlFreeDoc(doc);
 
@@ -214,6 +354,8 @@ ret_close_doc:
 	xmlCleanupParser();
 ret_none:
 	return ret;
+
+
 }
 
 static void free_xml_crc_entry(void *entry) {
