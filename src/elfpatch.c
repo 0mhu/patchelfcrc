@@ -232,9 +232,6 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 {
 	Elf_Kind ek;
 	const char *type_string = "unrecognized";
-	size_t header_count = 0ull;
-	GElf_Phdr phdr;
-	size_t i;
 
 	ret_val_if_ep_err(ep, -1001);
 
@@ -274,20 +271,6 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 	if (!elf_patch_get_sections(ep)) {
 		print_err("No sections in file.\n");
 		return -1;
-	}
-
-	/* Get program headers */
-	if ( elf_getphdrnum(ep->elf, &header_count) != 0) {
-		print_err("Error reading count of program headers: %s\n", elf_errmsg(-1));
-		return -1;
-	}
-
-	for (i = 0ull; i < header_count; i++) {
-		if (gelf_getphdr(ep->elf, (int)i, &phdr) != &phdr) {
-			print_err("Error reading program header (%zu): %s\n", i, elf_errmsg(-1));
-			return -1;
-		}
-		print_debug("Read program header %zu\n", i);
 	}
 
 	return 0;
