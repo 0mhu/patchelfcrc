@@ -40,8 +40,8 @@ int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *secti
 		goto ret_none;
 	}
 
-	//xmlTextWriterSetIndentString(writer, BAD_CAST "\t");
-	//xmlTextWriterSetIndent(writer, 1);
+	xmlTextWriterSetIndentString(writer, BAD_CAST "\t");
+	xmlTextWriterSetIndent(writer, 1);
 
 	xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL);
 	/* Generate the root node */
@@ -51,7 +51,10 @@ int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *secti
 	xmlTextWriterStartElement(writer, BAD_CAST "settings");
 	xmlTextWriterWriteFormatElement(writer, BAD_CAST "poly", "0x%" PRIx64, crc_params->polynomial);
 	xmlTextWriterWriteFormatElement(writer, BAD_CAST "start", "0x%" PRIx32, crc_params->start_value);
-	xmlTextWriterWriteFormatElement(writer, BAD_CAST "rev", "%s", crc_params->rev ? "true" : "false");
+	if (crc_params->rev) {
+		xmlTextWriterStartElement(writer, BAD_CAST "rev");
+		xmlTextWriterEndElement(writer);
+	}
 	xmlTextWriterWriteFormatElement(writer, BAD_CAST "xor", "0x%" PRIx32, crc_params->xor);
 	bitsize = elf_patch_get_bits(ep);
 	if (bitsize < 0) {
