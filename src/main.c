@@ -407,12 +407,14 @@ int main(int argc, char **argv)
 	/* Check if all sections are present */
 	if (check_all_sections_present(ep, cmd_opts.section_list)) {
 		ret = -2;
-		goto free_cmds;
+		goto ret_close_elf;
 	}
 
 	/* Compute CRCs over sections */
 	crcs = (uint32_t *)malloc(sl_list_length(cmd_opts.section_list) * sizeof(uint32_t));
-	compute_crcs(ep, cmd_opts.section_list, &cmd_opts, crcs);
+	if (compute_crcs(ep, cmd_opts.section_list, &cmd_opts, crcs)) {
+		goto ret_close_elf;
+	}
 
 	if (reporting_get_verbosity()) {
 		print_crcs(cmd_opts.section_list, crcs);
@@ -427,6 +429,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+ret_close_elf:
 	elf_patch_close_and_free(ep);
 
 free_cmds:
