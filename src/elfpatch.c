@@ -534,6 +534,11 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	/* Get data object of section */
 	output_sec_data = elf_getdata(output_section->scn, NULL);
 	sec_bytes = (uint8_t *)output_sec_data->d_buf;
+	if (!sec_bytes) {
+		print_err("Output section '%s' does not contain loadable data. It has to be allocated in the ELF file\n",
+			  section);
+		goto ret_err;
+	}
 
 	/* Check the start and end magics */
 	if (check_start_magic) {
