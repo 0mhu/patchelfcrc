@@ -272,7 +272,8 @@ static int elf_patch_read_program_headers(elfpatch_handle_t *ep)
 			print_err("Error reading program header (%zu): %s\n", i, elf_errmsg(-1));
 			goto ret_free_err;
 		}
-		print_debug("Program Header (i): mem_size: %zu, file_size: %zu, vma: %p, lma: %p, file offset: %zu\n",
+		print_debug("Program Header (%zu): mem_size: %zu, file_size: %zu, vma: %p, lma: %p, file offset: %zu\n",
+			    i,
 			    (size_t)hdr->p_memsz, (size_t)hdr->p_filesz, (void *)hdr->p_vaddr, (void *)hdr->p_paddr,
 			    hdr->p_offset);
 	}
@@ -291,11 +292,37 @@ ret_free_err:
 static void resolve_section_lmas(elfpatch_handle_t *ep)
 {
 	SlList *sec_iter;
+	struct elf_section *sec;
+	size_t idx;
+	uint64_t sec_file_offset;
+	uint64_t section_offset_in_segment;
+	const GElf_Phdr *phdr;
 
 	ret_if_ep_err(ep);
 
 	for (sec_iter = ep->sections; sec_iter; sec_iter = sl_list_next(sec_iter)) {
+		sec = (struct elf_section *)sec_iter->data;
+		if (!sec)
+			continue;
 
+		if (sec->section_header.sh_type == SHT_NOBITS) {
+			/* Section does not contain data. It may be allocated but is not loaded. Therefore, LMA=VMA. */
+			sec->lma = (uint64_t)sec->section_header.sh_addr;
+			continue;
+		}
+
+		sec_file_offset = (uint64_t) sec->section_header.sh_offset;
+
+		/* Check in which segment the file offset is located */
+		for (idx = 0; idx < ep->program_headers_count; idx++) {
+			phdr = &ep->program_headers[idx];
+			if (sec_file_offset >= phdr->p_offset && sec_file_offset < (phdr->p_offset + phdr->p_filesz)) {
+				/* Section lies within this segment */
+				section_offset_in_segment = sec_file_offset - phdr->p_offset;
+				sec->lma = ((uint64_t)phdr->p_paddr) + section_offset_in_segment;
+				break;
+			}
+		}
 	}
 }
 
