@@ -55,16 +55,16 @@ struct elfpatch {
 #define is_elfpatch_struct(x) ((x) && (x)->magic == (ELFPATCH_MAGIC))
 
 #define ret_if_ep_err(ep) do { \
-	if (!is_elfpatch_struct((ep))) { \
-	return; \
-	} \
-	} while(0)
+		if (!is_elfpatch_struct((ep))) { \
+			return; \
+		} \
+	} while (0)
 
 #define ret_val_if_ep_err(ep, val) do { \
-	if (!is_elfpatch_struct((ep))) { \
-	return (val); \
-	} \
-	} while(0)
+		if (!is_elfpatch_struct((ep))) { \
+			return val; \
+		} \
+	} while (0)
 
 /**
  * @brief Convert a series of 4 bytes into a uint32_t dpending on endianess
@@ -197,7 +197,7 @@ static SlList *elf_patch_get_sections(elfpatch_handle_t *ep)
 		sl_list_free_full(ret, (void (*)(void *))free_elf_section_element);
 	ep->sections = NULL;
 
-	if (elf_getshdrstrndx (ep->elf , &shstrndx) != 0) {
+	if (elf_getshdrstrndx(ep->elf, &shstrndx) != 0) {
 		print_err("ELF error: %s\n", elf_errmsg(-1));
 		goto ret_free_section_list;
 	}
@@ -218,9 +218,10 @@ static SlList *elf_patch_get_sections(elfpatch_handle_t *ep)
 		sec->lma = (uint64_t)sec->section_header.sh_addr;
 
 		name = elf_strptr(ep->elf, shstrndx, sec->section_header.sh_name);
-		if (name) {
+
+		if (name)
 			sec->name = strdup(name);
-		}
+
 		ret = sl_list_append(ret, sec);
 	}
 
@@ -431,15 +432,13 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly, bool expect_l
 		switch (ident[5]) {
 		case 1:
 			print_debug("ELF Endianess: little\n");
-			if (!expect_little_endian) {
+			if (!expect_little_endian)
 				print_err("Big endian format expected. File is little endian. Double check settings!\n");
-			}
 			break;
 		case 2:
 			print_debug("ELF Endianess: big\n");
-			if (expect_little_endian) {
+			if (expect_little_endian)
 				print_err("Little endian format expected. File is big endian. Double check settings!\n");
-			}
 			break;
 		default:
 			print_err("Cannot determine endianess of ELF file. EI_DATA is: %d\n", ident[5]);
@@ -454,9 +453,8 @@ close_elf:
 		ep->elf = NULL;
 	}
 close_fd:
-	if (ep->fd > 0) {
+	if (ep->fd > 0)
 		close(ep->fd);
-	}
 free_struct:
 	free(ep);
 	ep = NULL;
@@ -561,14 +559,12 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 				  section, padding_count);
 		}
 
-		for (idx = 0; idx < data->d_size; idx++) {
+		for (idx = 0; idx < data->d_size; idx++)
 			crc_push_byte(crc, ((char *)data->d_buf)[translate_index(idx, granularity, little_endian)]);
-		}
 
 		/* Pad with zeroes */
-		for (idx = 0; idx < padding_count; idx++) {
+		for (idx = 0; idx < padding_count; idx++)
 			crc_push_byte(crc, 0x00);
-		}
 	}
 
 	return 0;
@@ -711,8 +707,8 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_se
 
 	print_debug("Single CRC requires %u bytes.\n", (unsigned int)crc_size_bytes);
 
-	needed_space = calculate_needed_space_for_crcs(format, crc_data->elf_bits, check_start_magic, check_end_magic, crc_size_bytes,
-						       crc_count);
+	needed_space = calculate_needed_space_for_crcs(format, crc_data->elf_bits, check_start_magic,
+		check_end_magic, crc_size_bytes, crc_count);
 
 	print_debug("Required space for %zu CRCs%s: %zu (available: %zu)\n",
 		    crc_count,
@@ -782,11 +778,10 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_se
 		crc_64bit.length = 0ull;
 		crc_64bit.start_address = 0ull;
 
-		if (crc_data->elf_bits == 32) {
+		if (crc_data->elf_bits == 32)
 			memcpy(sec_bytes, &crc_32bit, sizeof(crc_32bit));
-		} else {
+		else
 			memcpy(sec_bytes, &crc_64bit, sizeof(crc_64bit));
-		}
 	}
 
 	/* Flag section data as invalid to trigger rewrite.
@@ -808,9 +803,8 @@ void elf_patch_close_and_free(elfpatch_handle_t *ep)
 		if (ep->readonly) {
 			print_debug("DRY RUN: File will not be updated\n");
 		} else {
-			if (elf_update(ep->elf, ELF_C_WRITE) < 0) {
+			if (elf_update(ep->elf, ELF_C_WRITE) < 0)
 				print_err("Error writing ELF file: %s\n", elf_errmsg(-1));
-			}
 		}
 	}
 
