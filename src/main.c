@@ -38,13 +38,15 @@ const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] co
 #define ARG_KEY_LIST (4)
 #define ARG_KEY_EXPORT (5)
 #define ARG_KEY_IMPORT (6)
-#define ARG_KEY_XSD (7)
+#define ARG_KEY_USE_VMA (7)
+#define ARG_KEY_XSD (8)
 
 struct command_line_options {
 	bool little_endian;
 	bool dry_run;
 	bool verbose;
 	bool print_xsd;
+	bool use_vma;
 	enum granularity granularity;
 	enum crc_format format;
 	struct crc_settings crc;
@@ -98,6 +100,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case ARG_KEY_XSD:
 		args->print_xsd = true;
+		break;
+	case ARG_KEY_USE_VMA:
+		args->use_vma = true;
 		break;
 	case 'p':
 		/* Polyniomial */
@@ -189,6 +194,7 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 		{"export", ARG_KEY_EXPORT, "XML", 0, "Export CRCs to XML file", 3},
 		{"import", ARG_KEY_IMPORT, "XML", 0, "Do not caclulate CRCs but import them from file", 3},
 		{"xsd", ARG_KEY_XSD, 0, 0, "Print XSD to stdout", 0},
+		{"use-vma", ARG_KEY_USE_VMA, 0, 0, "Use the VMA instead of the LMA for struct output", 2},
 		/* Sentinel */
 		{NULL, 0, 0, 0, NULL, 0}
 	};
@@ -214,6 +220,7 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->granularity = GRANULARITY_BYTE;
 	opts->dry_run = false;
 	opts->crc.xor = 0UL;
+	opts->use_vma = false;
 	opts->crc.polynomial = 0x104C11DB7UL;
 	opts->crc.start_value = 0xFFFFFFFFUL;
 	opts->crc.rev = false;
@@ -308,7 +315,7 @@ static int check_all_sections_present(elfpatch_handle_t *ep, SlList *list)
 	if (!ep)
 		return -1001;
 	if (!list) {
-		print_err("No input sections specified.\n")
+		print_err("No input sections specified.\n");
 		return -1;
 	}
 	for (iter = list; iter; iter = sl_list_next(iter)) {
@@ -424,6 +431,10 @@ int main(int argc, char **argv)
 	if (cmd_opts.export_xml && cmd_opts.import_xml) {
 		print_err("XML export and input cannot be specified at the same time.");
 		return -2;
+	}
+
+	if (cmd_opts.use_vma && cmd_opts.format != FORMAT_STRUCT) {
+		print_warn("--use-vma option only has an effect when exporting as struct output.");
 	}
 
 	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL) {

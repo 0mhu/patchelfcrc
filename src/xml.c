@@ -39,8 +39,8 @@ int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *secti
 
 	writer = xmlNewTextWriterFilename(path, 0);
 	if (!writer) {
-		print_err("Cannot create XML file %s\n", path)
-				ret = -1;
+		print_err("Cannot create XML file %s\n", path);
+		ret = -1;
 		goto ret_none;
 	}
 
@@ -393,7 +393,7 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 	/* Get all CRCs */
 	xpath_obj = xmlXPathEvalExpression(BAD_CAST "/patchelfcrc/sections/crc", xpath_ctx);
 	if (xmlXPathNodeSetIsEmpty(xpath_obj->nodesetval)) {
-		print_err("Internal error during read\n")
+		print_err("Internal error during read\n");
 		xml_crc_import_free(ret);
 		ret = NULL;
 		goto ret_close_doc;
