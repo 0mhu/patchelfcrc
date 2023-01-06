@@ -12,6 +12,7 @@
 [**\--poly**=*POLYNOMIAL*] [**\--reversed**] [**\--start-value**=*STARTVALUE*]
 [**--verbose**] [**\--xor-out**=*XORVAL*] [**\--end-magic**=*MAGIC*]
 [**\--crc-format**=*FORMAT*] [**\--use-vma**] [**\--list-crcs**] [**\--output-section**=*OUTPUTSECTION*]
+[**\--export**=*XMLFILE*] [**\--import**=*XMLFILE*]
 [**\--start-magic**=*MAGIC*] [**\--section**=*SECTION*] [**\--help**] [**\--usage**]
 [**\--version**] *ELF*
 
@@ -55,6 +56,12 @@
 
 **--start-magic**=*MAGIC*, **--endmagic**=*MAGIC*
 : *MAGIC* numbers (32 bit unsigned) that are expected to be found at the start and the end of the given output section. This serves as safety guard against accidental corruption of the output file. *It is highly recommended to use these options*.
+
+**--export**=*XMLFILE*
+: Export the calculated files to an XML file *XMLFILE*.
+
+**--import**=*XMLFILE*
+: Import the CRCs from an XML file *XMLFILE* and do not caclulate anything in the given *ELF*
 
 **--help**, **-h**, **-?**
 : Print help.
