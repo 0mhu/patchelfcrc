@@ -8,10 +8,11 @@
 # SYNOPSYS
 **patchelfcrc** [**-lrv?V**] [**-g** *GRANULARITY*] [**-p** *POLYNOMIAL*] [**-s** *STARTVALUE*]
 [**-x** *XORVAL*] [**-F** *FORMAT*] [**-O** *OUTPUTSECTION*] [**-S** *SEC*]
-[**\--granularity**=*GRANULARITY*] [**\--little-endian**] [**\--dry-run**]
+[**\--granularity**=*GRANULARITY*] [**\--little-endian**] [**\--dry-run**] [**\--xsd**]
 [**\--poly**=*POLYNOMIAL*] [**\--reversed**] [**\--start-value**=*STARTVALUE*]
 [**--verbose**] [**\--xor-out**=*XORVAL*] [**\--end-magic**=*MAGIC*]
-[**\--crc-format**=*FORMAT*] [**\--list-crcs**] [**\--output-section**=*OUTPUTSECTION*]
+[**\--crc-format**=*FORMAT*] [**\--use-vma**] [**\--list-crcs**] [**\--output-section**=*OUTPUTSECTION*]
+[**\--export**=*XMLFILE*] [**\--import**=*XMLFILE*]
 [**\--start-magic**=*MAGIC*] [**\--section**=*SECTION*] [**\--help**] [**\--usage**]
 [**\--version**] *ELF*
 
@@ -50,8 +51,17 @@
 **-F** *FORMAT*, **\--crc-format**=*FORMAT*
 : Output format to place in output section. Options for *FORMAT* are *bare* or *struct*
 
+**--use_vma**
+: Use the virtual memory address (VMA) instead of the load memory address (LMA) for the address fields in the struct output. This option is only considered if the format is *struct*
+
 **--start-magic**=*MAGIC*, **--endmagic**=*MAGIC*
 : *MAGIC* numbers (32 bit unsigned) that are expected to be found at the start and the end of the given output section. This serves as safety guard against accidental corruption of the output file. *It is highly recommended to use these options*.
+
+**--export**=*XMLFILE*
+: Export the calculated files to an XML file *XMLFILE*.
+
+**--import**=*XMLFILE*
+: Import the CRCs from an XML file *XMLFILE* and do not caclulate anything in the given *ELF*
 
 **--help**, **-h**, **-?**
 : Print help.
@@ -64,6 +74,12 @@
 
 **-V**, **\--version**
 : Print version number
+
+**\--list-crcs**
+: List the possible predefined CRCs
+
+**\--xsd**
+: Print the XSD file used to validate the XML import to stdout
 
 **--usage**
 : Print usage hints on command line options.

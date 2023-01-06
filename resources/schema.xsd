@@ -1,0 +1,74 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="dec_hex_num">
+  	<xs:restriction base="xs:string">
+  		<xs:pattern value="([0-9]+|0x[0-9a-fA-F]+)"></xs:pattern>
+  	</xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="elfclass_type">
+  	<xs:union>
+  		<xs:simpleType>
+        		<xs:restriction base="xs:integer">
+				<xs:minInclusive value="32"/>
+           			<xs:maxInclusive value="32"/>
+			</xs:restriction>
+        	</xs:simpleType>
+        	<xs:simpleType>
+        		<xs:restriction base="xs:integer">
+				<xs:minInclusive value="64"/>
+           			<xs:maxInclusive value="64"/>
+			</xs:restriction>
+        	</xs:simpleType>
+        	<xs:simpleType>
+        		<!-- This is in case something unsupported is encountered -->
+        		<xs:restriction base="xs:integer">
+				<xs:minInclusive value="-1"/>
+           			<xs:maxInclusive value="-1"/>
+			</xs:restriction>
+        	</xs:simpleType>
+  	</xs:union>
+  </xs:simpleType>
+  <xs:element name="patchelfcrc">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="settings">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="dec_hex_num" name="poly"/>
+              <xs:element type="dec_hex_num" name="start"/>
+              <xs:element type="xs:string" fixed="" name="rev" minOccurs="0" maxOccurs="1"/>
+              <xs:element type="dec_hex_num" name="xor"/>
+              <xs:element type="elfclass_type" name="elfclass"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="sections">
+          <xs:complexType>
+            <xs:choice minOccurs="1" maxOccurs="unbounded">
+              <xs:element name="crc">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="dec_hex_num">
+                      <xs:attribute name="name">
+                      	  <xs:simpleType>
+				<xs:restriction base="xs:string">
+	       			<xs:minLength value="1"/>
+	     			</xs:restriction>
+  			</xs:simpleType>
+                      </xs:attribute>
+                      <xs:attribute type="dec_hex_num" name="index"/>
+                      <xs:attribute type="dec_hex_num" name="vma"/>
+                      <xs:attribute type="dec_hex_num" name="lma"/>
+                      <xs:attribute type="dec_hex_num" name="size"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:choice>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute type="xs:string" name="version"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
+

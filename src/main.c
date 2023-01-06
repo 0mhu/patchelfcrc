@@ -27,6 +27,7 @@
 #include <linklist-lib/singly-linked-list.h>
 #include <patchelfcrc/reporting.h>
 #include <patchelfcrc/elfpatch.h>
+#include <patchelfcrc/xml.h>
 #include <fort.h>
 
 const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] com>";
@@ -35,11 +36,17 @@ const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] co
 #define ARG_KEY_START_MAGIC (2)
 #define ARG_KEY_END_MAGIC (3)
 #define ARG_KEY_LIST (4)
+#define ARG_KEY_EXPORT (5)
+#define ARG_KEY_IMPORT (6)
+#define ARG_KEY_USE_VMA (7)
+#define ARG_KEY_XSD (8)
 
 struct command_line_options {
 	bool little_endian;
 	bool dry_run;
 	bool verbose;
+	bool print_xsd;
+	bool use_vma;
 	enum granularity granularity;
 	enum crc_format format;
 	struct crc_settings crc;
@@ -51,6 +58,8 @@ struct command_line_options {
 	SlList *section_list;
 	const char *elf_path;
 	const char *output_section;
+	const char *export_xml;
+	const char *import_xml;
 };
 
 /**
@@ -80,8 +89,20 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		args->has_end_magic = true;
 		args->end_magic = strtoul(arg, NULL, 0);
 		break;
+	case ARG_KEY_EXPORT:
+		args->export_xml = arg;
+		break;
+	case ARG_KEY_IMPORT:
+		args->import_xml = arg;
+		break;
 	case ARG_KEY_LIST:
 		args->list = true;
+		break;
+	case ARG_KEY_XSD:
+		args->print_xsd = true;
+		break;
+	case ARG_KEY_USE_VMA:
+		args->use_vma = true;
 		break;
 	case 'p':
 		/* Polyniomial */
@@ -144,7 +165,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		return ARGP_ERR_UNKNOWN;
 	}
 
-
 	return 0;
 }
 
@@ -170,7 +190,11 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 		{"crc-format", 'F', "FORMAT", 0, "Output Format for CRCs.", 2},
 		{"start-magic", ARG_KEY_START_MAGIC, "STARTMAGIC", 0, "Check output section for start magic (uint32)", 2},
 		{"end-magic", ARG_KEY_END_MAGIC, "STARTMAGIC", 0, "Check output section for start magic (uint32)", 2},
-		{"list-crcs", ARG_KEY_LIST, 0, 0 , "List predefined CRCs", 0},
+		{"list-crcs", ARG_KEY_LIST, 0, 0, "List predefined CRCs", 0},
+		{"export", ARG_KEY_EXPORT, "XML", 0, "Export CRCs to XML file", 3},
+		{"import", ARG_KEY_IMPORT, "XML", 0, "Do not caclulate CRCs but import them from file", 3},
+		{"xsd", ARG_KEY_XSD, 0, 0, "Print XSD to stdout", 0},
+		{"use-vma", ARG_KEY_USE_VMA, 0, 0, "Use the VMA instead of the LMA for struct output", 2},
 		/* Sentinel */
 		{NULL, 0, 0, 0, NULL, 0}
 	};
@@ -192,9 +216,11 @@ static void prepare_default_opts(struct command_line_options *opts)
 {
 	opts->little_endian = false;
 	opts->verbose = false;
+	opts->print_xsd = false;
 	opts->granularity = GRANULARITY_BYTE;
 	opts->dry_run = false;
 	opts->crc.xor = 0UL;
+	opts->use_vma = false;
 	opts->crc.polynomial = 0x104C11DB7UL;
 	opts->crc.start_value = 0xFFFFFFFFUL;
 	opts->crc.rev = false;
@@ -205,6 +231,8 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->section_list = NULL;
 	opts->elf_path = NULL;
 	opts->output_section = NULL;
+	opts->export_xml = NULL;
+	opts->import_xml = NULL;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
@@ -239,6 +267,14 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 
 	if (cmd_opts->output_section) {
 		print_debug("Output section: %s\n", cmd_opts->output_section);
+	}
+
+	if (cmd_opts->export_xml) {
+		print_debug("Export CRCs to '%s'\n", cmd_opts->export_xml);
+	}
+
+	if (cmd_opts->import_xml) {
+		print_debug("Import CRCs from '%s'\n", cmd_opts->import_xml);
 	}
 
 	if (cmd_opts->section_list) {
@@ -279,7 +315,7 @@ static int check_all_sections_present(elfpatch_handle_t *ep, SlList *list)
 	if (!ep)
 		return -1001;
 	if (!list) {
-		print_err("No input sections specified.\n")
+		print_err("No input sections specified.\n");
 		return -1;
 	}
 	for (iter = list; iter; iter = sl_list_next(iter)) {
@@ -302,48 +338,65 @@ static int check_all_sections_present(elfpatch_handle_t *ep, SlList *list)
  * @param ep Elf patch
  * @param list List of section names to patch
  * @param opts Command line options. Used for CRC generation
- * @param[out] crcs Array of output CRCs. Must be large enough to hold all elements
- * @return 0 if successful
+ * @return CRC data
  */
-static int compute_crcs(elfpatch_handle_t *ep, SlList *list, const struct command_line_options *opts, uint32_t *crcs)
+static struct crc_import_data *compute_crcs(elfpatch_handle_t *ep, SlList *list, const struct command_line_options *opts)
 {
 	SlList *iter;
 	const char *sec_name;
-	int ret = 0;
+	struct crc_import_data *ret = NULL;
+	struct crc_entry *entry;
 	struct crc_calc _crc;
 	struct crc_calc * const crc = &_crc;
 	unsigned int idx;
+	uint64_t vma, lma, len;
 
 	/* Construct the CRC */
 	crc_init(crc, &opts->crc);
+
+	ret = xml_crc_import_alloc();
+	ret->elf_bits = elf_patch_get_bits(ep);
+	memcpy(&ret->crc_config, &opts->crc, sizeof(struct crc_settings));
 
 	for (iter = list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
 		crc_reset(crc);
 		sec_name = (const char *)iter->data;
 		if (elf_patch_compute_crc_over_section(ep, sec_name, crc, opts->granularity, opts->little_endian)) {
 			print_err("Error during CRC calculation. Exiting.\n");
-			ret = -1;
+			xml_crc_import_free(ret);
+			ret = NULL;
 			break;
 		}
 		crc_finish_calc(crc);
-		crcs[idx] = crc_get_value(crc);
+		if (elf_patch_get_section_address(ep, sec_name, &vma, &lma, &len)) {
+			print_err("Cannot retrieve section addresses. Internal error. Exiting.\n");
+			xml_crc_import_free(ret);
+			ret = NULL;
+			break;
+		}
+		entry = (struct crc_entry *)malloc(sizeof(struct crc_entry));
+		entry->name = strdup(sec_name);
+		entry->crc = crc_get_value(crc);
+		entry->lma = lma;
+		entry->size = len;
+		entry->vma = vma;
+		ret->crc_entries = sl_list_append(ret->crc_entries, entry);
 	}
 
+	crc_destroy(crc);
 	return ret;
 }
 
 /**
  * @brief Debug-print the CRCs of sections in form of a table
- * @param[in] list List of section names
- * @param[in] crcs Array of CRCs.
+ * @param[in] crc_data CRC data structure containing the CRCs.
  * @note The array @p crcs must be at least as long as @p list
  */
-static void print_crcs(SlList *list, const uint32_t *crcs)
+static void print_crcs(const struct crc_import_data *crc_data)
 {
 	SlList *iter;
-	unsigned int idx;
-	const char *sec_name;
 	ft_table_t *table;
+	const struct crc_entry *entry;
 
 	table = ft_create_table();
 
@@ -351,9 +404,9 @@ static void print_crcs(SlList *list, const uint32_t *crcs)
 	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
 	ft_write_ln(table, "Section", "CRC");
 
-	for (iter = list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
-		sec_name = (const char *)iter->data;
-		ft_printf_ln(table, "%s|0x%x", sec_name, crcs[idx]);
+	for (iter = crc_data->crc_entries; iter; iter = sl_list_next(iter)) {
+		entry = (const struct crc_entry *)iter->data;
+		ft_printf_ln(table, "%s|0x%x", entry->name, entry->crc);
 	}
 	print_debug("Calculated CRCs:\n%s\n", ft_to_string(table));
 	ft_destroy_table(table);
@@ -364,10 +417,16 @@ int main(int argc, char **argv)
 	struct command_line_options cmd_opts;
 	elfpatch_handle_t *ep;
 	int ret = 0;
-	uint32_t *crcs = NULL;
+	struct crc_import_data *crc_data = NULL;
+
+	xml_init();
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
+	if (cmd_opts.print_xsd) {
+		xml_print_xsd();
+		goto free_cmds;
+	}
 
 	if (cmd_opts.verbose || cmd_opts.dry_run)
 		reporting_enable_verbose();
@@ -384,8 +443,17 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if (!cmd_opts.output_section) {
-		print_err("No output section specified. Will continue but not patch file.\n");
+	if (cmd_opts.export_xml && cmd_opts.import_xml) {
+		print_err("XML export and input cannot be specified at the same time.\n");
+		return -2;
+	}
+
+	if (cmd_opts.use_vma && cmd_opts.format != FORMAT_STRUCT) {
+		print_warn("--use-vma option only has an effect when exporting as struct output.\n");
+	}
+
+	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL) {
+		print_err("No output section / XML export specified. Will continue but not create any output\n");
 	}
 
 	/* Do error printing if using a reversed polynomial. It is not implemented yet! */
@@ -404,40 +472,52 @@ int main(int argc, char **argv)
 		goto free_cmds;
 	}
 
-	/* Check if all sections are present */
-	if (check_all_sections_present(ep, cmd_opts.section_list)) {
-		ret = -2;
-		goto ret_close_elf;
-	}
+	if (!cmd_opts.import_xml) {
+		/* Check if all sections are present */
+		if (check_all_sections_present(ep, cmd_opts.section_list)) {
+			ret = -2;
+			goto ret_close_elf;
+		}
 
-	/* Compute CRCs over sections */
-	crcs = (uint32_t *)malloc(sl_list_length(cmd_opts.section_list) * sizeof(uint32_t));
-	if (compute_crcs(ep, cmd_opts.section_list, &cmd_opts, crcs)) {
-		goto ret_close_elf;
-	}
+		/* Compute CRCs over sections */
+		crc_data = compute_crcs(ep, cmd_opts.section_list, &cmd_opts);
+		if (!crc_data) {
+			goto ret_close_elf;
+		}
 
-	if (reporting_get_verbosity()) {
-		print_crcs(cmd_opts.section_list, crcs);
+		if (reporting_get_verbosity()) {
+			print_crcs(crc_data);
+		}
+	} else {
+		crc_data = xml_import_from_file(cmd_opts.import_xml);
 	}
 
 	if (cmd_opts.output_section) {
-		if (elf_patch_write_crcs_to_section(ep, cmd_opts.output_section, cmd_opts.section_list,
-					crcs, 32, cmd_opts.start_magic, cmd_opts.end_magic,
-					cmd_opts.has_start_magic, cmd_opts.has_end_magic,
-					cmd_opts.format, cmd_opts.little_endian)) {
+		/* Construct data */
+
+		if (elf_patch_write_crcs_to_section(ep, cmd_opts.output_section, crc_data, cmd_opts.use_vma,
+						    cmd_opts.start_magic, cmd_opts.end_magic, cmd_opts.has_end_magic,
+						    cmd_opts.has_end_magic, cmd_opts.format, cmd_opts.little_endian)) {
 			ret = -1;
+		}
+	}
+
+	if (cmd_opts.export_xml) {
+		if (xml_write_crcs_to_file(cmd_opts.export_xml, crc_data)) {
+			print_err("Error during XML generation\n");
+			ret = -3;
 		}
 	}
 
 ret_close_elf:
 	elf_patch_close_and_free(ep);
-free_cmds:
 
+free_cmds:
 	free_cmd_args(&cmd_opts);
 
 	/* Free CRCs if necessary */
-	if (crcs)
-		free(crcs);
+	if (crc_data)
+		xml_crc_import_free(crc_data);
 
 	return ret;
 }
