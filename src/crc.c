@@ -56,7 +56,8 @@ static void internal_push_byte(struct crc_calc *crc, const uint8_t *data, size_t
 	crc_val = crc->crc_val;
 
 	for (i = 0; i < len; i++, data++) {
-		crc_val = ((crc_val << 8) & crc->crc_mask) ^ crc->table[((crc_val >> (crc->crc_length-8u)) & 0xff) ^ *data];
+		crc_val = ((crc_val << 8) & crc->crc_mask) ^
+			crc->table[((crc_val >> (crc->crc_length-8u)) & 0xff) ^ *data];
 	}
 
 	crc->crc_val = crc_val;
