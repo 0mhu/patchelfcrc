@@ -45,6 +45,8 @@ struct elfpatch {
 	GElf_Ehdr ehdr;
 	int class;
 	SlList *sections;
+	GElf_Phdr *program_headers; /**< @brief Program headers */
+	size_t program_headers_count; /**< @brief Number of program headers in the program headers array */
 };
 
 #define ELFPATCH_MAGIC 0x8545637Aul
@@ -228,6 +230,60 @@ ret_free_section_list:
 	return ret;
 }
 
+/**
+ * @brief Read program headers from ELF file and store them more conviniently in a linkled list
+ * @param ep Elfpatch object
+ * @return 0 if successful
+ * @return negative if error.
+ * @note The function will succeed even if no program heder is found in the file.
+ */
+static int elf_patch_read_program_headers(elfpatch_handle_t *ep)
+{
+	size_t header_count = 0ull;
+	GElf_Phdr *hdr;
+	size_t i;
+
+	ret_val_if_ep_err(ep, -1001);
+
+	if (ep->program_headers_count > 0 && ep->program_headers) {
+		/* Free the program headers. They are owned by the ELF object. So no need to free them */
+		free(ep->program_headers);
+		ep->program_headers_count = 0;
+	}
+
+	if (elf_getphdrnum(ep->elf, &header_count)) {
+		print_err("Error reading program headers: %s\n", elf_errmsg(-1));
+		return -1;
+	}
+
+	ep->program_headers = (GElf_Phdr *)malloc(header_count * sizeof(GElf_Phdr));
+	if (!ep->program_headers) {
+		/* Mem error. Abort. Program will crash eventually */
+		return -1;
+	}
+
+	for (i = 0u; i < header_count; i++) {
+		hdr = &ep->program_headers[i];
+		if (gelf_getphdr(ep->elf, (int)i, hdr) != hdr) {
+			print_err("Error reading program header (%zu): %s\n", i, elf_errmsg(-1));
+			goto ret_free_err;
+		}
+		print_debug("Program Header (i): mem_size: %zu, file_size: %zu, vma: %p, lma: %p, file offset: %zu\n",
+			    (size_t)hdr->p_memsz, (size_t)hdr->p_filesz, (void *)hdr->p_vaddr, (void *)hdr->p_paddr,
+			    hdr->p_offset);
+	}
+
+	ep->program_headers_count = header_count;
+
+	return 0;
+
+ret_free_err:
+	if (ep->program_headers)
+		free(ep->program_headers);
+	ep->program_headers_count = 0u;
+	return -1;
+}
+
 static int elf_patch_update_info(elfpatch_handle_t *ep)
 {
 	Elf_Kind ek;
@@ -273,6 +329,11 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 		return -1;
 	}
 
+	if (elf_patch_read_program_headers(ep)) {
+		print_err("Error reading program headers.\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -292,6 +353,11 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly, bool expect_l
 	ep = (struct elfpatch *)calloc(1u, sizeof(struct elfpatch));
 	ep->magic = ELFPATCH_MAGIC;
 	ep->readonly = readonly;
+
+	/* This shouldn't really be necessary due to the use of calloc() */
+	ep->sections = NULL;
+	ep->program_headers = NULL;
+	ep->program_headers_count = 0u;
 
 	ep->fd = open(path, readonly ? O_RDONLY : O_RDWR, 0);
 	if (ep->fd < 0) {
@@ -696,6 +762,12 @@ void elf_patch_close_and_free(elfpatch_handle_t *ep)
 	if (ep->sections)
 		sl_list_free_full(ep->sections, (void (*)(void *))free_elf_section_element);
 	ep->sections = NULL;
+
+	if (ep->program_headers) {
+		free(ep->program_headers);
+		ep->program_headers = NULL;
+	}
+	ep->program_headers_count = 0u;
 
 	ep->elf = NULL;
 	ep->fd = 0;
