@@ -574,8 +574,8 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 	return 0;
 }
 
-static size_t calculate_needed_space_for_crcs(elfpatch_handle_t *ep,
-					      enum crc_format format,
+static size_t calculate_needed_space_for_crcs(enum crc_format format,
+					      uint8_t source_elf_bits,
 					      bool check_start_magic, bool check_end_magic,
 					      uint8_t crc_size_bytes, size_t crc_count)
 {
@@ -588,7 +588,7 @@ static size_t calculate_needed_space_for_crcs(elfpatch_handle_t *ep,
 	case FORMAT_STRUCT:
 		/* Calculate space for CRCs including sentinel struct at the end */
 		needed_space = (crc_count + 1) *
-				(ep->class == ELFCLASS32
+				(source_elf_bits == 32
 					? sizeof(struct crc_out_struct_32bit)
 					: sizeof(struct crc_out_struct_64bit));
 		break;
@@ -599,8 +599,8 @@ static size_t calculate_needed_space_for_crcs(elfpatch_handle_t *ep,
 	/* Add existing magic numbers to required space */
 	if (check_start_magic) {
 		needed_space += 4u;
-		/* Account for paading after 32 bit magic value in case of structure usage on 64 bit systems */
-		if (ep->class == ELFCLASS64 && format == FORMAT_STRUCT)
+		/* Account for padding after 32 bit magic value in case of structure usage on 64 bit systems */
+		if (source_elf_bits == 64 && format == FORMAT_STRUCT)
 			needed_space += 4u;
 	}
 	if (check_end_magic)
@@ -629,13 +629,15 @@ static void get_section_load_addr(const struct elf_section *sec, uint64_t *lma)
 }
 
 
-int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, const SlList *section_name_list,
-				    const uint32_t *crcs, uint8_t crc_size_bits, uint32_t start_magic, uint32_t end_magic,
-				    bool check_start_magic, bool check_end_magic, enum crc_format format, bool little_endian)
+int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_sec_name,
+				    const struct crc_import_data *crc_data, bool use_vma,
+				    uint32_t start_magic, uint32_t end_magic,
+				    bool check_start_magic, bool check_end_magic,
+				    enum crc_format format, bool little_endian)
 {
 	int ret = -1;
+	uint8_t crc_size_bits;
 	struct elf_section *output_section;
-	struct elf_section *input_section;
 	Elf_Data *output_sec_data;
 	const SlList *iter;
 	size_t needed_space;
@@ -643,12 +645,16 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	uint8_t crc_size_bytes;
 	uint8_t *sec_bytes;
 	size_t idx;
+	struct crc_entry *crc_entry;
 	struct crc_out_struct_32bit crc_32bit;
 	struct crc_out_struct_64bit crc_64bit;
+	uint64_t in_sec_addr, in_sec_len;
 
 	ret_val_if_ep_err(ep, -1000);
 
 	print_debug("== Patch output file ==\n");
+
+	crc_size_bits = crc_len_from_poly(crc_data->crc_config.polynomial);
 
 	if (crc_size_bits < 1u || crc_size_bits > 32u) {
 		print_err("Unsupported CRC size: %u", (unsigned int)crc_size_bits);
@@ -656,12 +662,12 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	}
 
 	/* All pointer parameters are required */
-	if (!section || !section_name_list || !crcs)
+	if (!output_sec_name || !crc_data)
 		return -1000;
 
-	output_section = find_section_in_list(ep->sections, section);
+	output_section = find_section_in_list(ep->sections, output_sec_name);
 	if (!output_section) {
-		print_err("Cannot find output section '%s' to place CRCs. Exiting.\n", section);
+		print_err("Cannot find output section '%s' to place CRCs. Exiting.\n", output_sec_name);
 		goto ret_err;
 	}
 
@@ -669,8 +675,8 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	output_sec_data = elf_getdata(output_section->scn, NULL);
 	sec_bytes = (uint8_t *)output_sec_data->d_buf;
 	if (!sec_bytes) {
-		print_err("Output section '%s' does not contain loadable data. It has to be allocated in the ELF file\n",
-			  section);
+		print_err("Output section '%s' does not contain loadable data. It has to be allocated in the ELF file.\n",
+			  output_sec_name);
 		goto ret_err;
 	}
 
@@ -695,17 +701,17 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 
 	/* Calculate Bytes needed for CRC */
 	crc_size_bytes = (crc_size_bits + 7u) / 8u;
-	crc_count = sl_list_length(section_name_list);
+	crc_count = sl_list_length(crc_data->crc_entries);
 	if (crc_count < 1) {
 		/* No CRCs to patch... */
 		ret = -1;
-		print_err("No CRCs to patch. This is probably an internal error.\n");
+		print_err("No CRCs to patch.\n");
 		goto ret_err;
 	}
 
 	print_debug("Single CRC requires %u bytes.\n", (unsigned int)crc_size_bytes);
 
-	needed_space = calculate_needed_space_for_crcs(ep, format, check_start_magic, check_end_magic, crc_size_bytes,
+	needed_space = calculate_needed_space_for_crcs(format, crc_data->elf_bits, check_start_magic, check_end_magic, crc_size_bytes,
 						       crc_count);
 
 	print_debug("Required space for %zu CRCs%s: %zu (available: %zu)\n",
@@ -726,44 +732,42 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	if (format == FORMAT_BARE) {
 		if (check_start_magic)
 			sec_bytes += 4u;
-		for (iter = section_name_list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
-			print_debug("Write CRC 0x%08x (%u bytes) for section %s\n", crcs[idx],
-				    (unsigned int)crc_size_bytes,
-				    iter->data);
-			write_crc_to_byte_array(sec_bytes, crcs[idx], crc_size_bytes, little_endian);
+		for (iter = crc_data->crc_entries, idx = 0; iter; iter = sl_list_next(iter), idx++) {
+			crc_entry = (struct crc_entry *)iter->data;
+			print_debug("Write CRC 0x%08x (%u bytes) for section %s\n", crc_entry->crc,
+				(unsigned int)crc_size_bytes,
+				crc_entry->name);
+			write_crc_to_byte_array(sec_bytes, crc_entry->crc, crc_size_bytes, little_endian);
 			sec_bytes += crc_size_bytes;
 		}
 	} else if (format == FORMAT_STRUCT) {
 		if (check_start_magic)
 			sec_bytes += 4u;
-		if (check_start_magic && ep->class == ELFCLASS64)
+		if (check_start_magic && crc_data->elf_bits == 64)
 			sec_bytes += 4u;
 
-		for (iter = section_name_list, idx = 0; iter; iter = sl_list_next(iter), idx++) {
-			input_section = find_section_in_list(ep->sections, (const char *)iter->data);
-			if (!input_section) {
-				print_err("Internal error. Please report this. %s:%d ", __FILE__, __LINE__);
-				ret = -2;
-				goto ret_err;
-			}
-			print_debug("Write CRC 0x%08x (%u bytes) for section %s.\n", crcs[idx],
+		for (iter = crc_data->crc_entries, idx = 0; iter; iter = sl_list_next(iter), idx++) {
+			crc_entry = (struct crc_entry *)iter->data;
+			in_sec_addr = use_vma ? crc_entry->vma : crc_entry->lma;
+			in_sec_len = crc_entry->size;
+			print_debug("Write CRC 0x%08x (%u bytes) for section %s.\n", crc_entry->crc,
 				    (unsigned int)crc_size_bytes,
-				    iter->data);
+				    crc_entry->name);
 			print_debug("Corresponding input section at 0x%"PRIx64", length: %"PRIu64"\n",
-				    (uint64_t)input_section->section_header.sh_addr,
-				    (uint64_t)input_section->section_header.sh_size);
-			if (ep->class == ELFCLASS32) {
-				crc_32bit.crc = crcs[idx];
-				crc_32bit.length = (uint32_t)input_section->section_header.sh_size;
-				crc_32bit.start_address = (uint32_t)input_section->section_header.sh_addr;
+				    in_sec_addr,
+				    in_sec_len);
+			if (crc_data->elf_bits == 32) {
+				crc_32bit.crc = crc_entry->crc;
+				crc_32bit.length = (uint32_t)in_sec_len;
+				crc_32bit.start_address = (uint32_t)in_sec_addr;
 				memcpy(sec_bytes, &crc_32bit, sizeof(crc_32bit));
 				sec_bytes += sizeof(crc_32bit);
 			} else {
 				/* 64 bit case */
-				crc_64bit.crc = crcs[idx];
+				crc_64bit.crc = crc_entry->crc;
 				crc_64bit._unused_dummy = 0ul;
-				crc_64bit.length = (uint64_t)input_section->section_header.sh_size;
-				crc_64bit.start_address = (uint64_t)input_section->section_header.sh_addr;
+				crc_64bit.length = in_sec_len;
+				crc_64bit.start_address = in_sec_addr;
 				memcpy(sec_bytes, &crc_64bit, sizeof(crc_64bit));
 				sec_bytes += sizeof(crc_64bit);
 			}
@@ -778,7 +782,7 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 		crc_64bit.length = 0ull;
 		crc_64bit.start_address = 0ull;
 
-		if (ep->class == ELFCLASS32) {
+		if (crc_data->elf_bits == 32) {
 			memcpy(sec_bytes, &crc_32bit, sizeof(crc_32bit));
 		} else {
 			memcpy(sec_bytes, &crc_64bit, sizeof(crc_64bit));

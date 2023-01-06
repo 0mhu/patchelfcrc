@@ -22,18 +22,15 @@ void xml_init(void)
 	LIBXML_TEST_VERSION;
 }
 
-int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *section_name_list,
-			   const struct crc_settings *crc_params, elfpatch_handle_t *ep)
+int xml_write_crcs_to_file(const char *path, const struct crc_import_data *crc_data)
 {
 	int ret = 0;
-	int bitsize;
 	xmlTextWriter *writer;
-	SlList *name_iter;
-	const char *section_name;
+	SlList *entry_iter;
+	const struct crc_entry *entry;
 	size_t index;
-	uint64_t vma, len, lma;
 
-	if (!path || !crcs || !section_name_list || !crc_params || !ep) {
+	if (!path || !crc_data) {
 		return -1000;
 	}
 
@@ -53,38 +50,32 @@ int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *secti
 	xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "version", "%s", version_string);
 
 	xmlTextWriterStartElement(writer, BAD_CAST "settings");
-	xmlTextWriterWriteFormatElement(writer, BAD_CAST "poly", "0x%" PRIx64, crc_params->polynomial);
-	xmlTextWriterWriteFormatElement(writer, BAD_CAST "start", "0x%" PRIx32, crc_params->start_value);
-	if (crc_params->rev) {
+	xmlTextWriterWriteFormatElement(writer, BAD_CAST "poly", "0x%" PRIx64, crc_data->crc_config.polynomial);
+	xmlTextWriterWriteFormatElement(writer, BAD_CAST "start", "0x%" PRIx32, crc_data->crc_config.start_value);
+	if (crc_data->crc_config.rev) {
 		xmlTextWriterStartElement(writer, BAD_CAST "rev");
 		xmlTextWriterEndElement(writer);
 	}
-	xmlTextWriterWriteFormatElement(writer, BAD_CAST "xor", "0x%" PRIx32, crc_params->xor);
-	bitsize = elf_patch_get_bits(ep);
-	if (bitsize < 0) {
+	xmlTextWriterWriteFormatElement(writer, BAD_CAST "xor", "0x%" PRIx32, crc_data->crc_config.xor);
+	if (crc_data->elf_bits < 0) {
 		print_err("Cannot determine ELF class. Generated XML will be faulty.\n");
 		ret |= -1;
 	}
-	xmlTextWriterWriteFormatElement(writer, BAD_CAST "elfclass", "%d", bitsize);
+	xmlTextWriterWriteFormatElement(writer, BAD_CAST "elfclass", "%d", crc_data->elf_bits);
 	xmlTextWriterEndElement(writer); /* End settings */
 
 	xmlTextWriterStartElement(writer, BAD_CAST "sections");
 
 	/* Output all section CRCs */
-	for (name_iter = section_name_list, index = 0u; name_iter; name_iter = sl_list_next(name_iter), index++) {
-		section_name = (const char *)name_iter->data;
+	for (entry_iter = crc_data->crc_entries, index = 0u; entry_iter; entry_iter = sl_list_next(entry_iter), index++) {
+		entry = (const struct crc_entry *)entry_iter->data;
 		xmlTextWriterStartElement(writer, BAD_CAST "crc");
-		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "name", "%s", section_name);
+		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "name", "%s", entry->name);
 		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "index", "%zu", index);
-		if (elf_patch_get_section_address(ep, section_name, &vma, &lma, &len)) {
-			print_err("Could not retrieve section addresses / length of section '%s'. XML output will be faulty.\n",
-				  section_name);
-			ret |= -1;
-		}
-		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "vma", "0x%" PRIx64, vma);
-		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "lma", "0x%" PRIx64, lma);
-		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "size", "0x%" PRIx64, len);
-		xmlTextWriterWriteFormatRaw(writer, "0x%" PRIx32, crcs[index]);
+		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "vma", "0x%" PRIx64, entry->vma);
+		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "lma", "0x%" PRIx64, entry->lma);
+		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "size", "0x%" PRIx64, entry->size);
+		xmlTextWriterWriteFormatRaw(writer, "0x%" PRIx32, entry->crc);
 		xmlTextWriterEndElement(writer); /* End crc */
 	}
 	xmlTextWriterEndElement(writer); /* End sections */
@@ -98,13 +89,13 @@ ret_none:
 	return ret;
 }
 
-static struct xml_crc_import *xml_crc_import_alloc(void)
+struct crc_import_data *xml_crc_import_alloc(void)
 {
-	struct xml_crc_import *ret = NULL;
+	struct crc_import_data *ret = NULL;
 
-	ret = (struct xml_crc_import *)malloc(sizeof(struct xml_crc_import));
+	ret = (struct crc_import_data *)malloc(sizeof(struct crc_import_data));
 	if (ret)
-		ret->xml_crc_entries = NULL;
+		ret->crc_entries = NULL;
 	else
 		print_err("Error. Out of memory. This should never happen\n");
 
@@ -346,10 +337,10 @@ static int get_uint32_from_node_content(xmlNodePtr node, uint32_t *output)
 }
 
 
-struct xml_crc_import *xml_import_from_file(const char *path)
+struct crc_import_data *xml_import_from_file(const char *path)
 {
-	struct xml_crc_import *ret = NULL;
-	struct xml_crc_entry *crc;
+	struct crc_import_data *ret = NULL;
+	struct crc_entry *crc;
 	xmlDocPtr doc;
 	xmlNodePtr root_node;
 	xmlNodePtr current_node;
@@ -434,8 +425,8 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 
 	for (i = 0; i < xpath_obj->nodesetval->nodeNr; i++) {
 		current_node = xpath_obj->nodesetval->nodeTab[i];
-		crc = (struct xml_crc_entry *)malloc(sizeof(struct xml_crc_entry));
-		ret->xml_crc_entries = sl_list_append(ret->xml_crc_entries, crc);
+		crc = (struct crc_entry *)malloc(sizeof(struct crc_entry));
+		ret->crc_entries = sl_list_append(ret->crc_entries, crc);
 
 		get_uint64_from_node_attribute(current_node, "vma", &tmp_num64);
 		crc->vma = tmp_num64;
@@ -446,7 +437,7 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 		get_uint32_from_node_content(current_node, &tmp_num32);
 		crc->crc = tmp_num32;
 
-		crc->name = (char *)xmlGetProp(current_node, "name");
+		crc->name = (char *)xmlGetProp(current_node, BAD_CAST "name");
 	}
 
 ret_close_doc:
@@ -467,9 +458,9 @@ ret_none:
 
 }
 
-static void free_xml_crc_entry(void *entry)
+static void free_crc_entry(void *entry)
 {
-	struct xml_crc_entry *e = (struct xml_crc_entry *)entry;
+	struct crc_entry *e = (struct crc_entry *)entry;
 
 	if (entry) {
 		if (e->name)
@@ -478,13 +469,13 @@ static void free_xml_crc_entry(void *entry)
 	}
 }
 
-void xml_crc_import_free(struct xml_crc_import *data)
+void xml_crc_import_free(struct crc_import_data *data)
 {
 	if (!data)
 		return;
 
-	sl_list_free_full(data->xml_crc_entries, free_xml_crc_entry);
-	data->xml_crc_entries = NULL;
+	sl_list_free_full(data->crc_entries, free_crc_entry);
+	data->crc_entries = NULL;
 	free(data);
 }
 

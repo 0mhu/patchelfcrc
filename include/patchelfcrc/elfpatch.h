@@ -27,6 +27,7 @@
 #include <patchelfcrc/crc.h>
 #include <stdbool.h>
 #include <linklist-lib/singly-linked-list.h>
+#include <patchelfcrc/crc-datatypes.h>
 
 typedef struct elfpatch elfpatch_handle_t;
 
@@ -87,17 +88,9 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 
 void elf_patch_close_and_free(elfpatch_handle_t *ep);
 
-/**
- * @brief Write CRCs to output section. This will have no effect, if file is opened read onyl
- * @param ep Elf patch object
- * @param[in] section Section name to place CRCs in
- * @param[in] section_name_list The list of sections the data belongs to
- * @param[in] crcs CRCs. Must be of the same lenght as the \p section_name_list
- * @return 0 Success
- * @return -1000 Parameter error
- * @return -1 internal error
- */
-int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, const SlList *section_name_list,
-                    const uint32_t *crcs, uint8_t crc_size_bits, uint32_t start_magic, uint32_t end_magic,
-                    bool check_start_magic, bool check_end_magic, enum crc_format format, bool little_endian);
+int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_sec_name,
+                    const struct crc_import_data *crc_data, bool use_vma,
+                    uint32_t start_magic, uint32_t end_magic,
+                    bool check_start_magic, bool check_end_magic,
+                    enum crc_format format, bool little_endian);
 #endif /* _ELFPATCH_H_ */
