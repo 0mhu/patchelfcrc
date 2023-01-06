@@ -429,12 +429,12 @@ int main(int argc, char **argv)
 	}
 
 	if (cmd_opts.export_xml && cmd_opts.import_xml) {
-		print_err("XML export and input cannot be specified at the same time.");
+		print_err("XML export and input cannot be specified at the same time.\n");
 		return -2;
 	}
 
 	if (cmd_opts.use_vma && cmd_opts.format != FORMAT_STRUCT) {
-		print_warn("--use-vma option only has an effect when exporting as struct output.");
+		print_warn("--use-vma option only has an effect when exporting as struct output.\n");
 	}
 
 	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL) {
