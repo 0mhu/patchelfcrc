@@ -28,7 +28,7 @@
 		.xor = outxor, \
 		.start_value = init, \
 		.rev = reverse \
-}}
+} }
 
 const struct named_crc predefined_crc_table[] = {
 	NAMED_CRC("crc-8", 0x107, false, 0x00, 0x00),
@@ -70,7 +70,7 @@ const struct named_crc predefined_crc_table[] = {
 	NAMED_CRC("jamcrc", 0x104C11DB7, true, 0xFFFFFFFF, 0x00000000),
 	NAMED_CRC("xfer", 0x1000000AF, false, 0x00000000, 0x00000000),
 	/* SENTINEL */
-	{.name = NULL, .settings = {0, 0, 0, false}},
+	{ .name = NULL, .settings = {0, 0, 0, false} },
 };
 
 const struct named_crc *reverse_lookup_named_crc(const struct crc_settings *settings)
