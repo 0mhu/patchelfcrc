@@ -30,9 +30,8 @@ int xml_write_crcs_to_file(const char *path, const struct crc_import_data *crc_d
 	const struct crc_entry *entry;
 	size_t index;
 
-	if (!path || !crc_data) {
+	if (!path || !crc_data)
 		return -1000;
-	}
 
 	writer = xmlNewTextWriterFilename(path, 0);
 	if (!writer) {
@@ -67,7 +66,9 @@ int xml_write_crcs_to_file(const char *path, const struct crc_import_data *crc_d
 	xmlTextWriterStartElement(writer, BAD_CAST "sections");
 
 	/* Output all section CRCs */
-	for (entry_iter = crc_data->crc_entries, index = 0u; entry_iter; entry_iter = sl_list_next(entry_iter), index++) {
+	for (entry_iter = crc_data->crc_entries, index = 0u;
+	entry_iter;
+	entry_iter = sl_list_next(entry_iter), index++) {
 		entry = (const struct crc_entry *)entry_iter->data;
 		xmlTextWriterStartElement(writer, BAD_CAST "crc");
 		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "name", "%s", entry->name);
@@ -222,7 +223,8 @@ static int convert_number_string_to_uint(const char *data, uint64_t *output)
  * @return 0 if successful
  * @return negative in case of an error
  */
-static int get_uint64_from_xpath_content(const char *xpath, xmlXPathContextPtr xpath_ctx, uint64_t *output, bool required)
+static int get_uint64_from_xpath_content(const char *xpath, xmlXPathContextPtr xpath_ctx,
+						uint64_t *output, bool required)
 {
 	const char *data;
 	int ret = -1;
@@ -245,7 +247,8 @@ static int get_uint64_from_xpath_content(const char *xpath, xmlXPathContextPtr x
  * @return 0 if successful
  * @return negative in case of an error
  */
-static int get_uint32_from_xpath_content(const char *xpath, xmlXPathContextPtr xpath_ctx, uint32_t *output, bool required)
+static int get_uint32_from_xpath_content(const char *xpath, xmlXPathContextPtr xpath_ctx,
+						uint32_t *output, bool required)
 {
 	const char *data;
 	uint64_t tmp;
@@ -359,10 +362,10 @@ struct crc_import_data *xml_import_from_file(const char *path)
 		print_err("Error reading XML file: %s\n", path);
 		goto ret_none;
 	}
+
 	root_node = xmlDocGetRootElement(doc);
-	if (!root_node) {
+	if (!root_node)
 		goto ret_close_doc;
-	}
 
 	/* Validate the document */
 	if (!validate_xml_doc(doc)) {
@@ -372,9 +375,8 @@ struct crc_import_data *xml_import_from_file(const char *path)
 
 	/* Get xpath context */
 	xpath_ctx = xmlXPathNewContext(doc);
-	if (!xpath_ctx) {
+	if (!xpath_ctx)
 		goto ret_close_doc;
-	}
 
 	/* Get the version number and print error in case of incompatibility. Continue either way */
 	cptr = (char *)xmlGetProp(root_node, BAD_CAST "version");
