@@ -22,7 +22,8 @@
 #include <stdbool.h>
 
 #define print_err(fmt, ...) fprintf(stderr, "[ERR] " fmt, ## __VA_ARGS__)
-#define print_warn(fmt, ...) fprintf(stderr, "[WARN] " fmt, ## __VAR__ARGS__)
+
+#define print_warn(fmt, ...) fprintf(stderr, "[WARN] " fmt, ## __VA_ARGS__)
 
 void print_debug(const char *fmt, ...);
 
