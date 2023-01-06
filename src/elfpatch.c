@@ -35,6 +35,7 @@ struct elf_section {
 	GElf_Shdr section_header;
 	Elf_Scn *scn;
 	char *name;
+	uint64_t lma; /**< @Resolved load memory address of a section. May be equivalent to VMA */
 };
 
 struct elfpatch {
@@ -161,17 +162,18 @@ static void print_sections(elfpatch_handle_t *ep)
 
 	/* Write header */
 	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
-	ft_write_ln(table, "Section", "Type", "Size", "Address", "File Offset");
+	ft_write_ln(table, "Section", "Type", "Size", "VMA", "LMA", "File Offset");
 
 	for (iter = ep->sections; iter; iter = sl_list_next(iter)) {
 		section = (const struct elf_section *)iter->data;
 		if (!section)
 			continue;
-		ft_printf_ln(table, "%s|%s|%lu|0x%p|0x%p",
+		ft_printf_ln(table, "%s|%s|%lu|%p|%p|%p",
 			     section->name,
 			     section_type_to_str(section->section_header.sh_type),
 			     section->section_header.sh_size,
 			     (void *)section->section_header.sh_addr,
+			     (void *)section->lma,
 			     (void *)section->section_header.sh_offset
 			     );
 	}
@@ -211,6 +213,10 @@ static SlList *elf_patch_get_sections(elfpatch_handle_t *ep)
 			free(sec);
 			continue;
 		}
+
+		/* Default setting of LMA if not modified by segment */
+		sec->lma = (uint64_t)sec->section_header.sh_addr;
+
 		name = elf_strptr(ep->elf, shstrndx, sec->section_header.sh_name);
 		if (name) {
 			sec->name = strdup(name);
@@ -219,8 +225,6 @@ static SlList *elf_patch_get_sections(elfpatch_handle_t *ep)
 	}
 
 	ep->sections = ret;
-
-	print_sections(ep);
 
 	return ret;
 
@@ -284,6 +288,17 @@ ret_free_err:
 	return -1;
 }
 
+static void resolve_section_lmas(elfpatch_handle_t *ep)
+{
+	SlList *sec_iter;
+
+	ret_if_ep_err(ep);
+
+	for (sec_iter = ep->sections; sec_iter; sec_iter = sl_list_next(sec_iter)) {
+
+	}
+}
+
 static int elf_patch_update_info(elfpatch_handle_t *ep)
 {
 	Elf_Kind ek;
@@ -333,6 +348,12 @@ static int elf_patch_update_info(elfpatch_handle_t *ep)
 		print_err("Error reading program headers.\n");
 		return -1;
 	}
+
+	/* Resolve section to segment mapping to calculate the LMA of eachs section */
+	resolve_section_lmas(ep);
+
+	/* Print the debug section table */
+	print_sections(ep);
 
 	return 0;
 }
@@ -572,6 +593,15 @@ static void get_section_addr_and_length(const struct elf_section *sec, uint64_t 
 		*len = sec->section_header.sh_size;
 }
 
+static void get_section_load_addr(const struct elf_section *sec, uint64_t *lma)
+{
+	if (!sec || !lma)
+		return;
+
+	*lma = sec->lma;
+}
+
+
 int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, const SlList *section_name_list,
 				    const uint32_t *crcs, uint8_t crc_size_bits, uint32_t start_magic, uint32_t end_magic,
 				    bool check_start_magic, bool check_end_magic, enum crc_format format, bool little_endian)
@@ -776,7 +806,7 @@ void elf_patch_close_and_free(elfpatch_handle_t *ep)
 }
 
 int elf_patch_get_section_address(elfpatch_handle_t *ep, const char *section,
-				  uint64_t *vma, uint64_t *len)
+				  uint64_t *vma, uint64_t *lma, uint64_t *len)
 {
 	const struct elf_section *sec;
 
@@ -789,6 +819,7 @@ int elf_patch_get_section_address(elfpatch_handle_t *ep, const char *section,
 		return -1;
 
 	get_section_addr_and_length(sec, vma, len);
+	get_section_load_addr(sec, lma);
 
 	return 0;
 }

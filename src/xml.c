@@ -31,7 +31,7 @@ int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *secti
 	SlList *name_iter;
 	const char *section_name;
 	size_t index;
-	uint64_t vma, len;
+	uint64_t vma, len, lma;
 
 	if (!path || !crcs || !section_name_list || !crc_params || !ep) {
 		return -1000;
@@ -76,12 +76,13 @@ int xml_write_crcs_to_file(const char *path, const uint32_t *crcs, SlList *secti
 		xmlTextWriterStartElement(writer, BAD_CAST "crc");
 		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "name", "%s", section_name);
 		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "index", "%zu", index);
-		if (elf_patch_get_section_address(ep, section_name, &vma, &len)) {
-			print_err("Could not retrieve section address / length of section '%s'. XML output will be faulty.\n",
+		if (elf_patch_get_section_address(ep, section_name, &vma, &lma, &len)) {
+			print_err("Could not retrieve section addresses / length of section '%s'. XML output will be faulty.\n",
 				  section_name);
 			ret |= -1;
 		}
 		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "vma", "0x%" PRIx64, vma);
+		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "lma", "0x%" PRIx64, lma);
 		xmlTextWriterWriteFormatAttribute(writer, BAD_CAST "size", "0x%" PRIx64, len);
 		xmlTextWriterWriteFormatRaw(writer, "0x%" PRIx32, crcs[index]);
 		xmlTextWriterEndElement(writer); /* End crc */
