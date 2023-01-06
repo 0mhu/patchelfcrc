@@ -7,7 +7,9 @@
 #include <patchelfcrc/elfpatch.h>
 
 struct xml_crc_entry {
+    char *name;
     uint64_t vma;
+    uint64_t lma;
     uint64_t size;
     uint32_t crc;
 };

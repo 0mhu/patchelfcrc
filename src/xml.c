@@ -296,7 +296,7 @@ int get_uint64_from_node_attribute(xmlNodePtr node, const char *attr, uint64_t *
 	return ret;
 }
 
-int get_uint32_from_node_attribute(xmlNodePtr node, const char *attr, uint32_t *output)
+static int get_uint32_from_node_attribute(xmlNodePtr node, const char *attr, uint32_t *output)
 {
 	int ret;
 	uint64_t tmp = 0;
@@ -304,7 +304,7 @@ int get_uint32_from_node_attribute(xmlNodePtr node, const char *attr, uint32_t *
 	ret = get_uint64_from_node_attribute(node, attr, &tmp);
 
 	if (tmp > UINT32_MAX || ret) {
-		print_err("Cannot conver attribute %s to number\n", attr);
+		print_err("Cannot convert attribute %s to 32 bit number\n", attr);
 		ret = -1;
 	} else {
 		*output = (uint32_t)tmp;
@@ -312,6 +312,39 @@ int get_uint32_from_node_attribute(xmlNodePtr node, const char *attr, uint32_t *
 
 	return ret;
 }
+
+static int get_uint64_from_node_content(xmlNodePtr node, uint64_t *output)
+{
+	xmlChar *data;
+	int ret = -1;
+
+	data = xmlNodeGetContent(node);
+
+	if (data) {
+		ret = convert_number_string_to_uint((const char *)data, output);
+		xmlFree(data);
+	}
+
+	return ret;
+}
+
+static int get_uint32_from_node_content(xmlNodePtr node, uint32_t *output)
+{
+	int ret;
+	uint64_t tmp = 0;
+
+	ret = get_uint64_from_node_content(node, &tmp);
+
+	if (tmp > UINT32_MAX || ret) {
+		print_err("Cannot convert content to 32 bit number\n");
+		ret = -1;
+	} else {
+		*output = (uint32_t)tmp;
+	}
+
+	return ret;
+}
+
 
 struct xml_crc_import *xml_import_from_file(const char *path)
 {
@@ -405,11 +438,16 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 		ret->xml_crc_entries = sl_list_append(ret->xml_crc_entries, crc);
 
 		get_uint64_from_node_attribute(current_node, "vma", &tmp_num64);
+		crc->vma = tmp_num64;
 		get_uint64_from_node_attribute(current_node, "size", &tmp_num64);
+		crc->size = tmp_num64;
 		get_uint64_from_node_attribute(current_node, "lma", &tmp_num64);
+		crc->lma = tmp_num64;
+		get_uint32_from_node_content(current_node, &tmp_num32);
+		crc->crc = tmp_num32;
 
+		crc->name = (char *)xmlGetProp(current_node, "name");
 	}
-
 
 ret_close_doc:
 
@@ -429,9 +467,15 @@ ret_none:
 
 }
 
-static void free_xml_crc_entry(void *entry) {
-	if (entry)
+static void free_xml_crc_entry(void *entry)
+{
+	struct xml_crc_entry *e = (struct xml_crc_entry *)entry;
+
+	if (entry) {
+		if (e->name)
+			xmlFree(e->name);
 		free(entry);
+	}
 }
 
 void xml_crc_import_free(struct xml_crc_import *data)
