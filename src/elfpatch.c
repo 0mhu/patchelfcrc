@@ -708,9 +708,9 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *section, 
 	needed_space = calculate_needed_space_for_crcs(ep, format, check_start_magic, check_end_magic, crc_size_bytes,
 						       crc_count);
 
-	print_debug("Required space for %zu CRCs %s: %zu (available: %zu)\n",
+	print_debug("Required space for %zu CRCs%s: %zu (available: %zu)\n",
 		    crc_count,
-		    (check_start_magic || check_end_magic ? "including magic values" : ""),
+		    (check_start_magic || check_end_magic ? " including magic values" : ""),
 		    needed_space,
 		    output_sec_data->d_size
 		    );

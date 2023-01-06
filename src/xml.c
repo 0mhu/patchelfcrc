@@ -405,9 +405,8 @@ struct xml_crc_import *xml_import_from_file(const char *path)
 		ret->xml_crc_entries = sl_list_append(ret->xml_crc_entries, crc);
 
 		get_uint64_from_node_attribute(current_node, "vma", &tmp_num64);
-		printf("vma: %x\n", (uint32_t)tmp_num64);
 		get_uint64_from_node_attribute(current_node, "size", &tmp_num64);
-		printf("size: %x\n", (uint32_t)tmp_num64);
+		get_uint64_from_node_attribute(current_node, "lma", &tmp_num64);
 
 	}
 
