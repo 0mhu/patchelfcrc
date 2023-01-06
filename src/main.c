@@ -108,11 +108,11 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		/* Polyniomial */
 		args->crc.polynomial = strtoull(arg, &endptr, 0);
 		if (endptr == arg) {
-			if ((looked_up_crc = lookup_named_crc(arg))) {
+			looked_up_crc = lookup_named_crc(arg);
+			if (looked_up_crc)
 				memcpy(&args->crc, &looked_up_crc->settings, sizeof(struct crc_settings));
-			} else {
+			else
 				argp_error(state, "Error parsing polynomial: %s\n", arg);
-			}
 		}
 		break;
 	case 'l':
@@ -261,28 +261,22 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 		print_debug("CRC length: %d\n", crc_len_from_poly(cmd_opts->crc.polynomial));
 	}
 
-	if (cmd_opts->elf_path) {
+	if (cmd_opts->elf_path)
 		print_debug("ELF file: %s\n", cmd_opts->elf_path);
-	}
 
-	if (cmd_opts->output_section) {
+	if (cmd_opts->output_section)
 		print_debug("Output section: %s\n", cmd_opts->output_section);
-	}
 
-	if (cmd_opts->export_xml) {
+	if (cmd_opts->export_xml)
 		print_debug("Export CRCs to '%s'\n", cmd_opts->export_xml);
-	}
 
-	if (cmd_opts->import_xml) {
+	if (cmd_opts->import_xml)
 		print_debug("Import CRCs from '%s'\n", cmd_opts->import_xml);
-	}
 
 	if (cmd_opts->section_list) {
-		for (list_iter = cmd_opts->section_list, i = 1; list_iter; list_iter = sl_list_next(list_iter), i++) {
+		for (list_iter = cmd_opts->section_list, i = 1; list_iter; list_iter = sl_list_next(list_iter), i++)
 			print_debug("Input section [%d]: \"%s\"\n", i, (const char *)list_iter->data);
-		}
 	}
-
 }
 
 static void free_cmd_args(struct command_line_options *opts)
@@ -322,6 +316,7 @@ static int check_all_sections_present(elfpatch_handle_t *ep, SlList *list)
 		sec_name = (const char *)iter->data;
 		if (!sec_name)
 			continue;
+
 		if (elf_patch_check_for_section(ep, sec_name)) {
 			print_err("Cannot find section '%s'\n", sec_name);
 			ret = -2;
@@ -340,7 +335,8 @@ static int check_all_sections_present(elfpatch_handle_t *ep, SlList *list)
  * @param opts Command line options. Used for CRC generation
  * @return CRC data
  */
-static struct crc_import_data *compute_crcs(elfpatch_handle_t *ep, SlList *list, const struct command_line_options *opts)
+static struct crc_import_data *compute_crcs(elfpatch_handle_t *ep, SlList *list,
+	const struct command_line_options *opts)
 {
 	SlList *iter;
 	const char *sec_name;
@@ -423,6 +419,7 @@ int main(int argc, char **argv)
 
 	prepare_default_opts(&cmd_opts);
 	parse_cmdline_options(&argc, &argv, &cmd_opts);
+
 	if (cmd_opts.print_xsd) {
 		xml_print_xsd();
 		goto free_cmds;
@@ -430,6 +427,7 @@ int main(int argc, char **argv)
 
 	if (cmd_opts.verbose || cmd_opts.dry_run)
 		reporting_enable_verbose();
+
 	print_verbose_start_info(&cmd_opts);
 
 	if (cmd_opts.list) {
@@ -448,13 +446,11 @@ int main(int argc, char **argv)
 		return -2;
 	}
 
-	if (cmd_opts.use_vma && cmd_opts.format != FORMAT_STRUCT) {
+	if (cmd_opts.use_vma && cmd_opts.format != FORMAT_STRUCT)
 		print_warn("--use-vma option only has an effect when exporting as struct output.\n");
-	}
 
-	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL) {
+	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL)
 		print_err("No output section / XML export specified. Will continue but not create any output\n");
-	}
 
 	/* Do error printing if using a reversed polynomial. It is not implemented yet! */
 	if (cmd_opts.crc.rev) {
@@ -481,13 +477,11 @@ int main(int argc, char **argv)
 
 		/* Compute CRCs over sections */
 		crc_data = compute_crcs(ep, cmd_opts.section_list, &cmd_opts);
-		if (!crc_data) {
+		if (!crc_data)
 			goto ret_close_elf;
-		}
 
-		if (reporting_get_verbosity()) {
+		if (reporting_get_verbosity())
 			print_crcs(crc_data);
-		}
 	} else {
 		crc_data = xml_import_from_file(cmd_opts.import_xml);
 	}
