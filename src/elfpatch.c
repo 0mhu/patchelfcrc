@@ -489,14 +489,14 @@ int elf_patch_check_for_section(elfpatch_handle_t *ep, const char *section)
 	return ret;
 }
 
-static size_t translate_index(size_t index, enum granularity granularity, bool little_endian)
+static size_t translate_index(size_t index, enum granularity granularity, bool little_endian, bool reversed)
 {
 	size_t word_idx;
 	size_t part_idx;
 	size_t d_index;
 	size_t gran_in_bytes;
 
-	if (!little_endian || granularity == GRANULARITY_BYTE)
+	if ((!little_endian && !reversed) || (little_endian && reversed) || granularity == GRANULARITY_BYTE)
 		return index;
 
 	gran_in_bytes = (size_t)granularity / 8u;
@@ -546,8 +546,9 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 		return -2;
 	}
 
-	/* If big endian or granularity is byte, simply compute CRC. No reordering is necessary */
-	if (!little_endian || granularity == GRANULARITY_BYTE) {
+	/* If big endian for non reversed / little endian for reversed or granularity is byte, simply compute CRC. No reordering is necessary */
+	if ((!little_endian && !crc->settings.rev) || (little_endian && crc->settings.rev) ||
+			granularity == GRANULARITY_BYTE) {
 		crc_push_bytes(crc, data->d_buf, data->d_size);
 	} else {
 		/* Little endian case with > byte sized chunks */
@@ -560,7 +561,12 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 		}
 
 		for (idx = 0; idx < data->d_size; idx++)
-			crc_push_byte(crc, ((char *)data->d_buf)[translate_index(idx, granularity, little_endian)]);
+			crc_push_byte(crc,
+				      ((char *)data->d_buf)[
+					translate_index(idx, granularity,
+						little_endian,
+						crc->settings.rev)
+					]);
 
 		/* Pad with zeroes */
 		for (idx = 0; idx < padding_count; idx++)
