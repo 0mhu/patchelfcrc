@@ -452,12 +452,6 @@ int main(int argc, char **argv)
 	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL)
 		print_err("No output section / XML export specified. Will continue but not create any output\n");
 
-	/* Do error printing if using a reversed polynomial. It is not implemented yet! */
-	if (cmd_opts.crc.rev) {
-		print_err("Reversed polynomials are not supported yet\nExiting...\n");
-		goto free_cmds;
-	}
-
 	/* Prepare libelf for use with the latest ELF version */
 	elf_version(EV_CURRENT);
 

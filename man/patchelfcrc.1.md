@@ -136,4 +136,4 @@ The output sections start and end are checked for the given magic numbers in ord
 The memory is interpreted as *little endian* and the CRC calculation granularity is a 32 bit *word*.
 
 # BUGS
-Currently, reversed CRC algorithms are not implemented.
+None
