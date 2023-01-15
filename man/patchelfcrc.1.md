@@ -1,4 +1,4 @@
-% patchelfcrc(1) 0.0.2
+% patchelfcrc(1) !version!
 % Mario Huettel
 % October 2022
 

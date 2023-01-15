@@ -1,14 +1,14 @@
 # Maintainer: Mario Hüttel <mario (dot) huettel (!) gmx (dot) net>
 
 pkgname=patchelfcrc
-pkgver=5e7f697
+pkgver=v1.0.0_rc1
 pkgrel=1
 pkgdesc="Tool for patching CRC checksums of sections into ELF binaries"
 arch=('i686' 'x86_64')
 url="https://git.shimatta.de/mhu/patchelfcrc"
 licence=('GPLv2')
 depends=('libelf' 'libxml2')
-makedepends=('cmake' 'pandoc' 'git' 'gvim')
+makedepends=('cmake' 'pandoc' 'git' 'gvim' 'bash')
 provides=('patchelfcrc')
 source=("${pkgname}-git"::"git+https://git.shimatta.de/mhu/patchelfcrc" "git+https://git.shimatta.de/3rd-party/libfort.git" "git+https://git.shimatta.de/mhu/linklist-lib")
 sha1sums=('SKIP' 'SKIP' 'SKIP')
