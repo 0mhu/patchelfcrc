@@ -34,13 +34,26 @@ int crc_len_from_poly(uint64_t polynomial)
 	return pos;
 }
 
+static uint32_t reverse_short_poly(uint32_t poly, uint8_t len)
+{
+	uint8_t i;
+	uint32_t ret = 0ul;
+
+	for (i = 0; i < len; i++) {
+		ret <<= 1;
+		ret |= (poly & 1u);
+		poly >>= 1;
+	}
+
+	return ret;
+}
+
 static uint64_t shorten_polynomial(uint64_t poly)
 {
 	int i;
-
-	for (i = 31; i <= 0; i--) {
-		if (poly & (1 << i)) {
-			poly &= ~(1<<i);
+	for (i = 32; i >= 0; i--) {
+		if (poly & ((uint64_t)1ull << i)) {
+			poly &= ~((uint64_t)1ull<<i);
 			break;
 		}
 	}
@@ -55,15 +68,22 @@ static void internal_push_byte(struct crc_calc *crc, const uint8_t *data, size_t
 
 	crc_val = crc->crc_val;
 
-	for (i = 0; i < len; i++, data++) {
-		crc_val = ((crc_val << 8) & crc->crc_mask) ^
-			crc->table[((crc_val >> (crc->crc_length-8u)) & 0xff) ^ *data];
+	if (crc->settings.rev) {
+		for (i = 0; i < len; i++, data++) {
+			crc_val = (crc_val >> 8) ^ crc->table[((crc_val & 0xFF) ^ *data)];
+		}
+	} else {
+		/* Non reversed algo */
+		for (i = 0; i < len; i++, data++) {
+			crc_val = ((crc_val << 8) & crc->crc_mask) ^
+				crc->table[((crc_val >> (crc->crc_length-8u)) & 0xff) ^ *data];
+		}
 	}
 
 	crc->crc_val = crc_val;
 }
 
-static void fill_crc_table(struct crc_calc *crc)
+static void fill_crc_table_non_reversed(struct crc_calc *crc)
 {
 	uint32_t input;
 	uint32_t crc_reg;
@@ -87,8 +107,44 @@ static void fill_crc_table(struct crc_calc *crc)
 				crc_reg <<= 1;
 			}
 		}
-		crc->table[input] = crc_reg;
+		crc->table[input] = crc_reg & crc->crc_mask;
 	}
+}
+
+static void fill_crc_table_reversed(struct crc_calc *crc)
+{
+	uint32_t input;
+	uint32_t crc_reg;
+	uint32_t short_poly;
+	int i;
+
+	short_poly = (uint32_t)shorten_polynomial(crc->settings.polynomial);
+	printf("Short (pre): 0x%x\n", short_poly);
+	short_poly = reverse_short_poly(short_poly, crc->crc_length);
+	printf("Short (post): 0x%x\n", short_poly);
+
+	for (input = 0; input <= 255u; input++) {
+		crc_reg = (uint32_t)input;
+		for (i = 0; i < 8; i++) {
+			/* Check LSB for reversed CRC shifting */
+			if (crc_reg & 1u) {
+				crc_reg >>= 1;
+				crc_reg ^= short_poly;
+			} else {
+				crc_reg >>= 1;
+			}
+		}
+		crc->table[input] = crc_reg & crc->crc_mask;
+	}
+
+}
+
+static void fill_crc_table(struct crc_calc *crc)
+{
+	if (crc->settings.rev)
+		fill_crc_table_reversed(crc);
+	else
+		fill_crc_table_non_reversed(crc);
 }
 
 void crc_init(struct crc_calc *crc, const struct crc_settings *settings)
