@@ -110,19 +110,26 @@ void list_predefined_crcs(void)
 {
 	ft_table_t *table;
 	const struct named_crc *iter;
+	struct crc_calc crc;
 
 	table = ft_create_table();
 
 	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
-	ft_write_ln(table, "Name", "Polynomial", "Reversed", "Start Value", "Output XOR");
+	ft_write_ln(table, "Name", "Polynomial", "Reversed", "Start Value", "Output XOR", "Test Value");
 
 	for (iter = predefined_crc_table; iter->name; iter++) {
-		ft_printf_ln(table, "%s|0x%lx|%s|0x%x|0x%x",
+		crc_init(&crc, &iter->settings);
+		/* Calculate the test value */
+		crc_push_bytes(&crc, (const uint8_t *)"123456789", 9);
+		crc_finish_calc(&crc);
+		ft_printf_ln(table, "%s|0x%lx|%s|0x%x|0x%x|0x%x",
 			     iter->name,
 			     iter->settings.polynomial,
 			     iter->settings.rev ? "yes" : "no",
 			     iter->settings.start_value,
-			     iter->settings.xor);
+			     iter->settings.xor,
+			     crc_get_value(&crc));
+		crc_destroy(&crc);
 	}
 
 	printf("%s\n", ft_to_string(table));
