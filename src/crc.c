@@ -119,9 +119,7 @@ static void fill_crc_table_reversed(struct crc_calc *crc)
 	int i;
 
 	short_poly = (uint32_t)shorten_polynomial(crc->settings.polynomial);
-	printf("Short (pre): 0x%x\n", short_poly);
 	short_poly = reverse_short_poly(short_poly, crc->crc_length);
-	printf("Short (post): 0x%x\n", short_poly);
 
 	for (input = 0; input <= 255u; input++) {
 		crc_reg = (uint32_t)input;
