@@ -290,6 +290,12 @@ static int elf_patch_read_program_headers(elfpatch_handle_t *ep)
 		return -1;
 	}
 
+	if (header_count == 0) {
+		/* No program headers found. This ELF file is probably not linked */
+		ep->program_headers_count = 0;
+		return 0;
+	}
+
 	ep->program_headers = (GElf_Phdr *)malloc(header_count * sizeof(GElf_Phdr));
 	if (!ep->program_headers) {
 		/* Mem error. Abort. Program will crash eventually */
@@ -335,9 +341,11 @@ static void resolve_section_lmas(elfpatch_handle_t *ep)
 		if (!sec)
 			continue;
 
+		/* By default each sections LMA is assumed to be its LMA as well */
+		sec->lma = (uint64_t)sec->section_header.sh_addr;
+
 		if (sec->section_header.sh_type == SHT_NOBITS) {
 			/* Section does not contain data. It may be allocated but is not loaded. Therefore, LMA=VMA. */
-			sec->lma = (uint64_t)sec->section_header.sh_addr;
 			continue;
 		}
 
