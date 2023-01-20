@@ -42,7 +42,7 @@ enum endianess {
 	END_BIG = 0x01020304ul,
 };
 
-#define HOST_ENDIANESS (_endianess_check_union.value)
+#define HOST_ENDIANESS (_endianess_check_union.val)
 
 struct elf_section {
 	GElf_Shdr section_header;
@@ -688,6 +688,7 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_se
 	struct crc_out_struct_32bit crc_32bit;
 	struct crc_out_struct_64bit crc_64bit;
 	uint64_t in_sec_addr, in_sec_len;
+	bool needs_byteswap;
 
 	ret_val_if_ep_err(ep, -1000);
 
@@ -785,6 +786,12 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_se
 		if (check_start_magic && crc_data->elf_bits == 64)
 			sec_bytes += 4u;
 
+		needs_byteswap = false;
+		if ((HOST_ENDIANESS != END_LITTLE && little_endian) ||
+				(HOST_ENDIANESS == END_LITTLE && !little_endian)) {
+			needs_byteswap = true;
+		}
+
 		for (iter = crc_data->crc_entries, idx = 0; iter; iter = sl_list_next(iter), idx++) {
 			crc_entry = (struct crc_entry *)iter->data;
 			in_sec_addr = use_vma ? crc_entry->vma : crc_entry->lma;
@@ -795,18 +802,19 @@ int elf_patch_write_crcs_to_section(elfpatch_handle_t *ep, const char *output_se
 			print_debug("Corresponding input section at 0x%"PRIx64", length: %"PRIu64"\n",
 				    in_sec_addr,
 				    in_sec_len);
+
 			if (crc_data->elf_bits == 32) {
-				crc_32bit.crc = crc_entry->crc;
-				crc_32bit.length = (uint32_t)in_sec_len;
-				crc_32bit.start_address = (uint32_t)in_sec_addr;
+				crc_32bit.crc = needs_byteswap ? bswap_32(crc_entry->crc) : crc_entry->crc;
+				crc_32bit.length = needs_byteswap ? bswap_32((uint32_t)in_sec_len) : (uint32_t)in_sec_len;
+				crc_32bit.start_address = needs_byteswap ? bswap_32((uint32_t)in_sec_addr) : (uint32_t)in_sec_addr;
 				memcpy(sec_bytes, &crc_32bit, sizeof(crc_32bit));
 				sec_bytes += sizeof(crc_32bit);
 			} else {
 				/* 64 bit case */
-				crc_64bit.crc = crc_entry->crc;
+				crc_64bit.crc = needs_byteswap ? bswap_32(crc_entry->crc) : crc_entry->crc;
 				crc_64bit._unused_dummy = 0ul;
-				crc_64bit.length = in_sec_len;
-				crc_64bit.start_address = in_sec_addr;
+				crc_64bit.length = needs_byteswap ? bswap_64(in_sec_len) : in_sec_len;
+				crc_64bit.start_address = needs_byteswap ? bswap_64(in_sec_addr) : in_sec_addr;
 				memcpy(sec_bytes, &crc_64bit, sizeof(crc_64bit));
 				sec_bytes += sizeof(crc_64bit);
 			}
