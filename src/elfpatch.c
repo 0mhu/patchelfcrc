@@ -30,6 +30,19 @@
 #include <fort.h>
 #include <inttypes.h>
 #include <patchelfcrc/crc-output-struct.h>
+#include <byteswap.h>
+
+static const union  {
+	uint8_t data[4];
+	uint32_t val;
+} _endianess_check_union = {{1u, 2u, 3u, 4u}};
+
+enum endianess {
+	END_LITTLE = 0x04030201ul,
+	END_BIG = 0x01020304ul,
+};
+
+#define HOST_ENDIANESS (_endianess_check_union.value)
 
 struct elf_section {
 	GElf_Shdr section_header;
