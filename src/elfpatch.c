@@ -148,6 +148,14 @@ static const char *section_type_to_str(Elf64_Word type)
 		return "INIT_ARRAY";
 	case SHT_FINI_ARRAY:
 		return "FINI_ARRAY";
+	case SHT_PREINIT_ARRAY:
+		return "PREINIT_ARRAY";
+	case SHT_DYNAMIC:
+		return "DYNAMIC";
+	case SHT_ARM_ATTRIBUTES:
+		return "ARM_ATTRIBUTES";
+	case SHT_ARM_PREEMPTMAP:
+		return "ARM_PREEMPTMAP";
 	default:
 		break;
 	}
@@ -159,6 +167,7 @@ static void print_sections(elfpatch_handle_t *ep)
 	SlList *iter;
 	ft_table_t *table;
 	const struct elf_section *section;
+	bool alloc, write, exec;
 
 	ret_if_ep_err(ep);
 
@@ -174,15 +183,23 @@ static void print_sections(elfpatch_handle_t *ep)
 
 	/* Write header */
 	ft_set_cell_prop(table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
-	ft_write_ln(table, "Section", "Type", "Size", "VMA", "LMA", "File Offset");
+	ft_write_ln(table, "Section", "Type", "ALLOC", "WRITE", "EXEC", "Size", "VMA", "LMA", "File Offset");
 
 	for (iter = ep->sections; iter; iter = sl_list_next(iter)) {
 		section = (const struct elf_section *)iter->data;
 		if (!section)
 			continue;
-		ft_printf_ln(table, "%s|%s|%lu|%p|%p|%p",
+
+		alloc = !!(section->section_header.sh_flags & SHF_ALLOC);
+		write = !!(section->section_header.sh_flags & SHF_WRITE);
+		exec = !!(section->section_header.sh_flags & SHF_EXECINSTR);
+
+		ft_printf_ln(table, "%s|%s|%s|%s|%s|%lu|%p|%p|%p",
 			     section->name,
 			     section_type_to_str(section->section_header.sh_type),
+			     alloc ? "x" : "",
+			     write ? "x" : "",
+			     exec ? "x" : "",
 			     section->section_header.sh_size,
 			     (void *)section->section_header.sh_addr,
 			     (void *)section->lma,
