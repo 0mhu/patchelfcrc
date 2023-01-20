@@ -90,14 +90,15 @@ static uint32_t get_uint32_from_byte_string(const uint8_t *data, bool little_end
 	uint32_t out = 0ul;
 	int i;
 
+	/* Always shift in in big endian format */
 	for (i = 0; i < 4; i++) {
-		if (little_endian)
-			out >>= 8u;
-		else
 			out <<= 8u;
-
-		out |= (((uint32_t)data[i]) << (little_endian ? 24u : 0u));
+		out |= (uint32_t)data[i];
 	}
+
+	/* Swap bytes if little endian */
+	if (little_endian)
+		out = bswap_32(out);
 
 	return out;
 }
@@ -109,14 +110,12 @@ static void write_crc_to_byte_array(uint8_t *byte_array, uint32_t crc, uint8_t c
 	if (!byte_array)
 		return;
 
+	if (!little_endian)
+		crc = bswap_32(crc);
+
 	for (i = 0; i < crc_size_bytes; i++) {
-		if (little_endian) {
-			byte_array[i] = (uint8_t)(crc & 0xFFul);
-			crc >>= 8u;
-		} else {
-			byte_array[i] = (uint8_t)((crc & 0xFF000000ul) >> 24u);
-			crc <<= 8u;
-		}
+		byte_array[i] = (uint8_t)(crc & 0xFFul);
+		crc >>= 8u;
 	}
 }
 
