@@ -84,6 +84,9 @@
 **--usage**
 : Print usage hints on command line options.
 
+**--no-color**
+: Force output on stdout and stderr to be pure text without color codes.
+
 # EXAMPLES
 
 **patchelfcrc** --list-crcs

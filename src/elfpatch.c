@@ -470,12 +470,12 @@ elfpatch_handle_t *elf_patch_open(const char *path, bool readonly, bool expect_l
 		case 1:
 			print_debug("ELF Endianess: little\n");
 			if (!expect_little_endian)
-				print_err("Big endian format expected. File is little endian. Double check settings!\n");
+				print_warn("Big endian format expected. File is little endian. Double check settings!\n");
 			break;
 		case 2:
 			print_debug("ELF Endianess: big\n");
 			if (expect_little_endian)
-				print_err("Little endian format expected. File is big endian. Double check settings!\n");
+				print_warn("Little endian format expected. File is big endian. Double check settings!\n");
 			break;
 		default:
 			print_err("Cannot determine endianess of ELF file. EI_DATA is: %d\n", ident[5]);

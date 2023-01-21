@@ -21,14 +21,25 @@
 
 #include <stdbool.h>
 
-#define print_err(fmt, ...) fprintf(stderr, "[ERR] " fmt, ## __VA_ARGS__)
+/**
+ * @brief Setting for reporting to console.
+ */
+enum reporting_color_mode {
+    COLOR_MODE_DETECT, /**< @brief Automatically detect if tty. If tty, color is used */
+    COLOR_MODE_COLOR, /**< @brief Force color mode on stderr */
+    COLOR_MODE_COLOR_OFF, /**< @brief Force no color on stderr */
+};
 
-#define print_warn(fmt, ...) fprintf(stderr, "[WARN] " fmt, ## __VA_ARGS__)
+void print_err(const char *fmt, ...);
+
+void print_warn(const char *fmt, ...);
 
 void print_debug(const char *fmt, ...);
 
-void reporting_enable_verbose(void);
+void reporting_enable_verbose(bool state);
 
 bool reporting_get_verbosity(void);
+
+void reporting_init(enum reporting_color_mode mode);
 
 #endif /* _REPORTING_H_ */

@@ -40,8 +40,10 @@ const char *argp_program_bug_address = "<mario [dot] huettel [at] linux [dot] co
 #define ARG_KEY_IMPORT (6)
 #define ARG_KEY_USE_VMA (7)
 #define ARG_KEY_XSD (8)
+#define ARG_KEY_FORCE_NO_COLOR (9)
 
 struct command_line_options {
+	bool force_nocolor;
 	bool little_endian;
 	bool dry_run;
 	bool verbose;
@@ -103,6 +105,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case ARG_KEY_USE_VMA:
 		args->use_vma = true;
+		break;
+	case ARG_KEY_FORCE_NO_COLOR:
+		args->force_nocolor = true;
 		break;
 	case 'p':
 		/* Polyniomial */
@@ -195,6 +200,7 @@ static int parse_cmdline_options(int *argc, char ***argv, struct command_line_op
 		{"import", ARG_KEY_IMPORT, "XML", 0, "Do not caclulate CRCs but import them from file", 3},
 		{"xsd", ARG_KEY_XSD, 0, 0, "Print XSD to stdout", 0},
 		{"use-vma", ARG_KEY_USE_VMA, 0, 0, "Use the VMA instead of the LMA for struct output", 2},
+		{"no-color", ARG_KEY_FORCE_NO_COLOR, 0, 0, "Force the output to be text only without colors", 0},
 		/* Sentinel */
 		{NULL, 0, 0, 0, NULL, 0}
 	};
@@ -425,8 +431,11 @@ int main(int argc, char **argv)
 		goto free_cmds;
 	}
 
+	/* Initialize console output */
+	reporting_init(cmd_opts.force_nocolor ? COLOR_MODE_COLOR_OFF : COLOR_MODE_DETECT);
+
 	if (cmd_opts.verbose || cmd_opts.dry_run)
-		reporting_enable_verbose();
+		reporting_enable_verbose(true);
 
 	print_verbose_start_info(&cmd_opts);
 
@@ -450,7 +459,7 @@ int main(int argc, char **argv)
 		print_warn("--use-vma option only has an effect when exporting as struct output.\n");
 
 	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL)
-		print_err("No output section / XML export specified. Will continue but not create any output\n");
+		print_warn("No output section / XML export specified. Will continue but not create any output\n");
 
 	/* Prepare libelf for use with the latest ELF version */
 	elf_version(EV_CURRENT);
