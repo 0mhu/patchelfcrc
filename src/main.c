@@ -243,8 +243,6 @@ static void prepare_default_opts(struct command_line_options *opts)
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
 {
-	int i;
-	SlList *list_iter;
 	const struct named_crc *predef_crc;
 
 	print_debug("Start CRC patching\n");
@@ -278,11 +276,6 @@ static void print_verbose_start_info(const struct command_line_options *cmd_opts
 
 	if (cmd_opts->import_xml)
 		print_debug("Import CRCs from '%s'\n", cmd_opts->import_xml);
-
-	if (cmd_opts->section_list) {
-		for (list_iter = cmd_opts->section_list, i = 1; list_iter; list_iter = sl_list_next(list_iter), i++)
-			print_debug("Input section [%d]: \"%s\"\n", i, (const char *)list_iter->data);
-	}
 }
 
 static void free_cmd_args(struct command_line_options *opts)
@@ -459,7 +452,7 @@ int main(int argc, char **argv)
 		print_warn("--use-vma option only has an effect when exporting as struct output.\n");
 
 	if (!cmd_opts.output_section && cmd_opts.export_xml == NULL)
-		print_warn("No output section / XML export specified. Will continue but not create any output\n");
+		print_warn("No output section or XML export specified. Will continue but not create any output.\n");
 
 	/* Prepare libelf for use with the latest ELF version */
 	elf_version(EV_CURRENT);
@@ -501,7 +494,7 @@ int main(int argc, char **argv)
 
 	if (cmd_opts.export_xml) {
 		if (xml_write_crcs_to_file(cmd_opts.export_xml, crc_data)) {
-			print_err("Error during XML generation\n");
+			print_err("Error during XML generation.\n");
 			ret = -3;
 		}
 	}
