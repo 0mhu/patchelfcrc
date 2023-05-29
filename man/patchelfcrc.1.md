@@ -135,7 +135,7 @@
 **patchelfcrc** -l -g word --start-magic=0x12345678 --end-magic=0x8754321 -p crc-32-mpeg -f bare -O .outputsection -S .text executable.elf
 : Calculate the CRC over *.text* section and place the result in the *.outputsection* section.
 The output sections start and end are checked for the given magic numbers in order to assure correct memory layout.
-*CRC-32-MPEG* is used as CRC algorothm.
+*CRC-32-MPEG* is used as CRC algorithm.
 The memory is interpreted as *little endian* and the CRC calculation granularity is a 32 bit *word*.
 
 # BUGS
