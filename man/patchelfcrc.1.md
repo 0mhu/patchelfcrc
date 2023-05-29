@@ -61,7 +61,7 @@
 : Export the calculated files to an XML file *XMLFILE*.
 
 **--import**=*XMLFILE*
-: Import the CRCs from an XML file *XMLFILE* and do not caclulate anything in the given *ELF*
+: Import the CRCs from an XML file *XMLFILE* and do not calculate anything in the given *ELF*
 
 **--help**, **-h**, **-?**
 : Print help.
@@ -134,7 +134,7 @@
 
 **patchelfcrc** -l -g word --start-magic=0x12345678 --end-magic=0x8754321 -p crc-32-mpeg -f bare -O .outputsection -S .text executable.elf
 : Calculate the CRC over *.text* section and place the result in the *.outputsection* section.
-The output sections start and end are checked for the given magic numbers in order to assure correct memory layout.
+The output sections start and end are checked for the given magic numbers in order to ensure correct memory layout.
 *CRC-32-MPEG* is used as CRC algorithm.
 The memory is interpreted as *little endian* and the CRC calculation granularity is a 32 bit *word*.
 
