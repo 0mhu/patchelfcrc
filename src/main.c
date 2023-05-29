@@ -239,6 +239,7 @@ static void prepare_default_opts(struct command_line_options *opts)
 	opts->output_section = NULL;
 	opts->export_xml = NULL;
 	opts->import_xml = NULL;
+    opts->force_nocolor = false;
 }
 
 static void print_verbose_start_info(const struct command_line_options *cmd_opts)
