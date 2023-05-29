@@ -561,25 +561,24 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 	/* Find section */
 	sec = find_section_in_list(ep->sections, section);
 	if (!sec) {
-		print_err("Cannot find section %s\n", section);
+		print_err("Cannot find section '%s'\n", section);
 		return -1;
 	}
 
 	data = elf_getdata(sec->scn, NULL);
 	if (!data) {
-		print_err("Error reading section data from %s: %s\n", section, elf_errmsg(-1));
+		print_err("Error reading section data from '%s': %s\n", section, elf_errmsg(-1));
 		return -1;
 	}
 
-	print_debug("Section data length: %lu\n", data->d_size);
 	if (!data->d_size) {
-		print_err("Section %s contains no data.\n", section);
+		print_err("Section '%s' contains no data.\n", section);
 		return -2;
 	}
 
 	/* NOBIT sections have a length but no data in the file. Abort in this case */
 	if (!data->d_buf) {
-		print_err("Section %s does not contain loadable data.\n", section);
+		print_err("Section '%s' does not contain loadable data.\n", section);
 		return -2;
 	}
 
@@ -593,7 +592,7 @@ int elf_patch_compute_crc_over_section(elfpatch_handle_t *ep, const char *sectio
 		/* Check granularity vs size of section */
 		padding_count = (gran_in_bytes - data->d_size % gran_in_bytes) % gran_in_bytes;
 		if (padding_count) {
-			print_err("Section '%s' is not a multiple size of the given granularity. %u zero padding bytes will be added.\n",
+			print_warn("Section '%s' is not a multiple size of the given granularity. %u zero padding bytes will be added.\n",
 				  section, padding_count);
 		}
 
@@ -633,7 +632,7 @@ static size_t calculate_needed_space_for_crcs(enum crc_format format,
 		break;
 	default:
 		needed_space = 0;
-		print_err("Unsupported CRC output format\n");
+		print_err("Unsupported CRC output format.\n");
 	}
 	/* Add existing magic numbers to required space */
 	if (check_start_magic) {
