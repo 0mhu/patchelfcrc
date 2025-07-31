@@ -34,6 +34,17 @@ aux_source_directory("src" CFILES)
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")
 
+
+if (DEFINED NO_VERSION_INFO)
+add_custom_target(
+		version-header
+	COMMAND
+		 mkdir -p ${GEN_HEADER_PATH} && bash "${CMAKE_CURRENT_SOURCE_DIR}/gen_version_header.sh" "${GEN_HEADER_PATH}/version.h" "dummy"
+        WORKING_DIRECTORY
+                ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating version header dummy"
+	)
+else(DEFINED NO_VERSION_INFO)
 add_custom_target(
 		version-header
 	COMMAND
@@ -42,6 +53,7 @@ add_custom_target(
 		${CMAKE_CURRENT_SOURCE_DIR}
 	COMMENT "Generating version header"
 	)
+endif(DEFINED NO_VERSION_INFO)
 
 add_custom_target(schema-header DEPENDS "${GEN_HEADER_PATH}/schema-blob.h")
 add_custom_command(
@@ -66,9 +78,10 @@ target_link_directories(${PROJECT_NAME} PRIVATE ${ELF_LIBRARY_DIRS} ${LIBXML2_LI
 target_include_directories(${PROJECT_NAME} PRIVATE ${ELF_INCLUDE_DIRS})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
 target_include_directories(${PROJECT_NAME} PRIVATE "include")
-add_dependencies(${PROJECT_NAME} version-header schema-header)
+add_dependencies(${PROJECT_NAME} schema-header)
+add_dependencies(${PROJECT_NAME} version-header)
 
-if (DOXYGEN_FOUND)
+if (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
 	set(DOXYFILE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxyfile.in")
 	set(DOXYFILE_DEST "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
 	configure_file(${DOXYFILE_SRC} ${DOXYFILE_DEST} @ONLY)
@@ -87,7 +100,7 @@ if (DOXYGEN_FOUND)
 		WORKING_DIRECTORY
 			${CMAKE_CURRENT_SOURCE_DIR}
 	)
-else (DOXYGEN_FOUND)
+else (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
 	message("${BoldMagenta}Doxygen needs to be installed to generate the doxygen documentation${ColorReset}")
 	message("${BoldMagenta}doxygen target will not be available${ColorReset}")
-endif (DOXYGEN_FOUND)
+endif (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
