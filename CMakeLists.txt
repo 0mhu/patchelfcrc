@@ -28,8 +28,6 @@ pkg_check_modules(ELF REQUIRED libelf)
 find_package(Doxygen)
 find_package(LibXml2 REQUIRED)
 
-add_subdirectory(man)
-
 aux_source_directory("src" CFILES)
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")
@@ -53,6 +51,7 @@ add_custom_target(
 		${CMAKE_CURRENT_SOURCE_DIR}
 	COMMENT "Generating version header"
 	)
+	add_subdirectory(man)
 endif(DEFINED NO_VERSION_INFO)
 
 add_custom_target(schema-header DEPENDS "${GEN_HEADER_PATH}/schema-blob.h")
