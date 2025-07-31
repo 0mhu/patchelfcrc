@@ -42,6 +42,8 @@ add_custom_target(
                 ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Generating version header dummy"
 	)
+	set (NO_VERSION_INFO true)
+	message("${BoldMagenta}No Version Information will be built${ColorReset}")
 else(DEFINED NO_VERSION_INFO)
 add_custom_target(
 		version-header
@@ -80,7 +82,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE "include")
 add_dependencies(${PROJECT_NAME} schema-header)
 add_dependencies(${PROJECT_NAME} version-header)
 
-if (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
+if (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
 	set(DOXYFILE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxyfile.in")
 	set(DOXYFILE_DEST "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
 	configure_file(${DOXYFILE_SRC} ${DOXYFILE_DEST} @ONLY)
@@ -99,7 +101,7 @@ if (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
 		WORKING_DIRECTORY
 			${CMAKE_CURRENT_SOURCE_DIR}
 	)
-else (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
+else  (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
 	message("${BoldMagenta}Doxygen needs to be installed to generate the doxygen documentation${ColorReset}")
 	message("${BoldMagenta}doxygen target will not be available${ColorReset}")
-endif (DOXYGEN_FOUND AND (NOT DEFINED NO_VERSION_INFO))
+endif  (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
