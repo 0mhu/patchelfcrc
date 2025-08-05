@@ -32,29 +32,17 @@ aux_source_directory("src" CFILES)
 
 set(GEN_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/include/generated")
 
-
-if (DEFINED NO_VERSION_INFO)
 add_custom_target(
 		version-header
 	COMMAND
-		 mkdir -p ${GEN_HEADER_PATH} && bash "${CMAKE_CURRENT_SOURCE_DIR}/gen_version_header.sh" "${GEN_HEADER_PATH}/version.h" "dummy"
-        WORKING_DIRECTORY
-                ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Generating version header dummy"
-	)
-	set (NO_VERSION_INFO true)
-	message("${BoldMagenta}No Version Information will be built${ColorReset}")
-else(DEFINED NO_VERSION_INFO)
-add_custom_target(
-		version-header
-	COMMAND
-		mkdir -p ${GEN_HEADER_PATH} && bash "${CMAKE_CURRENT_SOURCE_DIR}/gen_version_header.sh" "${GEN_HEADER_PATH}/version.h"
+		${CMAKE_COMMAND} -D SRC=${CMAKE_SOURCE_DIR}/version.h.template
+					 -D DST=${GEN_HEADER_PATH}/version.h
+					 -P ${CMAKE_SOURCE_DIR}/GenerateVersion.cmake
 	WORKING_DIRECTORY
 		${CMAKE_CURRENT_SOURCE_DIR}
 	COMMENT "Generating version header"
 	)
 	add_subdirectory(man)
-endif(DEFINED NO_VERSION_INFO)
 
 add_custom_target(schema-header DEPENDS "${GEN_HEADER_PATH}/schema-blob.h")
 add_custom_command(
