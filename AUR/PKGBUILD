@@ -16,7 +16,7 @@ sha1sums=('SKIP' 'SKIP' 'SKIP')
 pkgver () {
 	_date=`date +"%Y%m%d"`
 	cd "${srcdir}/${pkgname}-git"
-	echo "$(echo "$(sh ./gen-version-string.sh)" | sed 's/-/_/g')"
+	echo "$(echo "$(git describe --always --dirty)" | sed 's/-/_/g')"
 }
 
 build () {
