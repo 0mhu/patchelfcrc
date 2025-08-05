@@ -42,7 +42,9 @@ add_custom_target(
 		${CMAKE_CURRENT_SOURCE_DIR}
 	COMMENT "Generating version header"
 	)
-	add_subdirectory(man)
+
+
+add_subdirectory(man)
 
 add_custom_target(schema-header DEPENDS "${GEN_HEADER_PATH}/schema-blob.h")
 add_custom_command(

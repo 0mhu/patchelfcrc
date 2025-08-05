@@ -1,7 +1,6 @@
 set (MAN_PAGE_NAME "patchelfcrc.1.gz")
 
 add_custom_target(man-page
-	ALL
 	DEPENDS
 		${CMAKE_CURRENT_BINARY_DIR}/${MAN_PAGE_NAME}
 )
