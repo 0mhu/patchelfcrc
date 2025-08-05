@@ -70,7 +70,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE "include")
 add_dependencies(${PROJECT_NAME} schema-header)
 add_dependencies(${PROJECT_NAME} version-header)
 
-if (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
+if (DOXYGEN_FOUND)
 	set(DOXYFILE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxyfile.in")
 	set(DOXYFILE_DEST "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
 	configure_file(${DOXYFILE_SRC} ${DOXYFILE_DEST} @ONLY)
@@ -85,11 +85,13 @@ if (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
 
 	add_custom_target(doxygen-version-header
 		COMMAND
-			bash ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/gen-version-string.sh "${CMAKE_CURRENT_BINARY_DIR}/doxyversion.in"
+			${CMAKE_COMMAND} -D SRC="${CMAKE_SOURCE_DIR}/doxyversion.in.template"
+					 -D DST="${CMAKE_CURRENT_BINARY_DIR}/doxyversion.in"
+					 -P ${CMAKE_SOURCE_DIR}/GenerateVersion.cmake
 		WORKING_DIRECTORY
 			${CMAKE_CURRENT_SOURCE_DIR}
 	)
-else  (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
+else  (DOXYGEN_FOUND)
 	message("${BoldMagenta}Doxygen needs to be installed to generate the doxygen documentation${ColorReset}")
 	message("${BoldMagenta}doxygen target will not be available${ColorReset}")
-endif  (DOXYGEN_FOUND AND (NOT (DEFINED NO_VERSION_INFO)))
+endif  (DOXYGEN_FOUND)
