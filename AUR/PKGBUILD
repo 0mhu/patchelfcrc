@@ -24,6 +24,7 @@ build () {
 	cd "$srcdir/$pkgname-git/build"
 	cmake -DCMAKE_BUILD_TYPE=Release ..
 	make -j12
+	make man-page
 }
 
 prepare () {
