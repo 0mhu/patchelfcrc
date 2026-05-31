@@ -23,10 +23,10 @@
 
 # OPTIONS
 **-h**, **\--help**
-: Display help
+: Display help.
 
 **\--usage**
-: Display usage information
+: Display usage information.
 
 **-p** *POLYNOMIAL*, **\--polynomial**=*POLYNOMIAL*
 : Polynomial to use for CRC calculation. For a n bit wide CRC supply a number with n+1 bits and the MSB set. Alternatively, a predifined name can be supplied. See **\--list-crcs** for details. At maximum a 32 bit wide CRC can be calculated. If nothing is given, crc-32-mpeg is used.
@@ -49,47 +49,44 @@
 : The memory layout of the *ELFFILE* is in little-endian format.
 
 **-F** *FORMAT*, **\--crc-format**=*FORMAT*
-: Output format to place in output section. Options for *FORMAT* are *bare* or *struct*
+: Output format to place in output section. Options for *FORMAT* are *bare* or *struct*.
 
-**--use_vma**
-: Use the virtual memory address (VMA) instead of the load memory address (LMA) for the address fields in the struct output. This option is only considered if the format is *struct*
+**\--use_vma**
+: Use the virtual memory address (VMA) instead of the load memory address (LMA) for the address fields in the struct output. This option is only considered if the format is *struct*.
 
-**--start-magic**=*MAGIC*, **--endmagic**=*MAGIC*
+**\--start-magic**=*MAGIC*, **\--endmagic**=*MAGIC*
 : *MAGIC* numbers (32 bit unsigned) that are expected to be found at the start and the end of the given output section. This serves as safety guard against accidental corruption of the output file. *It is highly recommended to use these options*.
 
-**--export**=*XMLFILE*
+**\--export**=*XMLFILE*
 : Export the calculated files to an XML file *XMLFILE*.
 
-**--import**=*XMLFILE*
-: Import the CRCs from an XML file *XMLFILE* and do not calculate anything in the given *ELF*
+**\--import**=*XMLFILE*
+: Import the CRCs from an XML file *XMLFILE* and do not calculate anything in the given *ELF*.
 
-**--help**, **-h**, **-?**
+**\--help**, **-h**, **-?**
 : Print help.
 
 **\--dry-run**
-: Dry run. Do all calculations but do not write changes to file. *ELF* file will only be opened readonly. This mode implicitly activates the verbose output
+: Dry run. Do all calculations but do not write changes to file. *ELF* file will only be opened readonly. This mode implicitly activates the verbose output.
 
 **-v**, **\--verbose**
-: Activate verbose output
+: Activate verbose output.
 
 **-V**, **\--version**
 : Print version number
 
 **\--list-crcs**
-: List the possible predefined CRCs
+: List the possible predefined CRCs.
 
 **\--xsd**
-: Print the XSD file used to validate the XML import to stdout
+: Print the XSD file used to validate the XML import to stdout.
 
-**--usage**
-: Print usage hints on command line options.
-
-**--no-color**
+**\--no-color**
 : Force output on stdout and stderr to be pure text without color codes.
 
 # EXAMPLES
 
-**patchelfcrc** --list-crcs
+**patchelfcrc** \--list-crcs
 
 | Name             | Polynomial  | Reversed | Start Value | Output XOR |
 |------------------|-------------|----------|-------------|------------|
